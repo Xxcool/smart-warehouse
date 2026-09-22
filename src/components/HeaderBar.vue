@@ -26,19 +26,12 @@
 
     <!-- 右侧：天气气象、实时时钟与全屏 -->
     <div class="header-right-group">
-      <!-- 实时气象与环境感知指标 -->
+      <!-- 实时气象感知 (精简大屏风格) -->
       <div class="weather-card">
         <div class="weather-main">
           <span class="weather-icon">⛅</span>
-          <span class="weather-temp">24℃</span>
+          <span class="weather-temp">24<span class="temp-unit">°C</span></span>
           <span class="weather-cond">晴间多云</span>
-        </div>
-        <div class="weather-sub">
-          <span>💧 湿度 48%</span>
-          <span class="env-divider">|</span>
-          <span class="aqi-badge">🍃 AQI 26 优</span>
-          <span class="env-divider">|</span>
-          <span>💨 东南风 2级</span>
         </div>
       </div>
 
@@ -220,43 +213,41 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-width: 360px;
   justify-content: flex-end;
 }
 .weather-card {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  align-items: center;
 }
 .weather-main {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
   font-weight: 700;
   color: #1e293b;
 }
 .weather-icon {
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1;
 }
 .weather-temp {
   color: #0284c7;
-  font-family: ui-monospace, monospace;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: -0.2px;
+  display: inline-flex;
+  align-items: baseline;
 }
-.weather-sub {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: #64748b;
+.weather-temp .temp-unit {
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 2px;
 }
-.env-divider {
-  color: #cbd5e1;
-  font-size: 10px;
-}
-.aqi-badge {
-  color: #16a34a;
+.weather-cond {
+  color: #475569;
+  font-size: 13px;
   font-weight: 600;
 }
 .header-v-divider {

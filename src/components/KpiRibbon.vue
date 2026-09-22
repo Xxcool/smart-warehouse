@@ -28,7 +28,7 @@
       <div class="kpi-icon-box teal">❄️</div>
       <div class="kpi-content">
         <span class="kpi-pill-title">恒温冷链气密仓</span>
-        <span class="kpi-pill-val">-18.2 <small>℃</small> <span class="badge-status-green">温控 100% 达标</span></span>
+        <span class="kpi-pill-val">-18.2 <small>°C</small> <span class="badge-status-green">温控 100% 达标</span></span>
       </div>
     </div>
 

@@ -56,7 +56,7 @@ export const ENTITY_DATA: Record<EntityKey, EntityDetail> = {
     rows: [
       { l: "靠泊车牌", v: "重卡 鄂A·892W1", blue: true },
       { l: "自动化卸货进度", v: "78% (820/1050件)", progress: 78 },
-      { l: "货物温控", v: "冷鲜预包装食材 (-18℃达标)", green: true },
+      { l: "货物温控", v: "冷鲜预包装食材 (-18°C达标)", green: true },
       { l: "预计离泊时间", v: "约 6 分钟后" },
       { l: "司机签到", v: "张师傅 (电子回单已提交)" }
     ]
@@ -100,9 +100,9 @@ export const ENTITY_DATA: Record<EntityKey, EntityDetail> = {
   cold_storage: {
     title: "恒温冷链气密仓",
     sub: "双重隔离负压冷库 (❄️ 专属冷链标志)",
-    tag: "-18℃ 恒温",
+    tag: "-18°C 恒温",
     rows: [
-      { l: "库内核心温度", v: "-18.2 ℃ (标准 -18±0.5)", blue: true },
+      { l: "库内核心温度", v: "-18.2 °C (标准 -18±0.5)", blue: true },
       { l: "相对湿度控制", v: "45.2% RH", progress: 45 },
       { l: "双压缩机状态", v: "1用1备交替自检 (负荷65%)", green: true },
       { l: "气密风幕门", v: "红外快速感应闭合正常" },
