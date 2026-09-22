@@ -1,3 +1,11 @@
+<!--
+【掘金发布信息快捷卡】
+* 文章标题：Antigravity + Blender MCP：打造 3D 智慧仓储数字孪生
+* 文章摘要（95字）：告别找模型之痛！带你复盘如何用 Google Antigravity 搭载 Blender MCP 实现自动化 3D 建模，并结合 Vue 3 与 Three.js 打造 60 FPS 工业级智慧仓储数字孪生平台的实战全流程。
+* 文章封面：docs/images/cover.jpg
+* 推荐标签：前端, Three.js, Vue.js, 人工智能
+-->
+
 ![文章精选封面 (16:9 高清)](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/cover.jpg)
 
 # Antigravity + Blender MCP：打造 3D 智慧仓储数字孪生
