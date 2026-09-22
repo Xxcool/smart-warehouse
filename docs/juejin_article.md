@@ -1,3 +1,5 @@
+![文章精选封面 (16:9 高清)](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/cover.jpg)
+
 # Antigravity + Blender MCP：打造 3D 智慧仓储数字孪生
 
 > **项目在线体验 (Live Demo)**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)  
