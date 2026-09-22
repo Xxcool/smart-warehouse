@@ -11,3 +11,5 @@ yarn-error.log*
 pnpm-debug.log*
 *.local
 .vercel
+*juejin*
+*.draft.md
