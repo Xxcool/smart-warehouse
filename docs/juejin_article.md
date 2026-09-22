@@ -7,13 +7,13 @@
 
 ## 一、前言：前端做 3D 数字孪生的核心痛点
 
-随着智能制造、智慧物流与工业物联网（IoT）的快速发展，**3D 数字孪生（Digital Twin）可视化大屏**几乎成了各企业技术展示与调度运营的标配。
+随着智能制造、智慧物流与工业物联网（IoT）的快速演进，**3D 数字孪生（Digital Twin）管控大屏**已成为现代化工厂与仓储调度的核心基础设施。
 
-但长期以来，前端工程师在尝试涉足 3D WebGL（Three.js / WebGPU）领域时，总会被两个现实问题死死卡住：
-1. **模型资产极度匮乏**：网上能免费下载的模型要么是游戏低模、破面严重，要么是层级混乱的 CAD 巨无霸（动辄 300MB+），根本无法直接在浏览器端跑满 60 帧；
-2. **建模与前端逻辑割裂**：美术交给你的模型，构件原点全在 `(0, 0, 0)`、前挡风玻璃在移动端疯狂闪烁（Z-fighting）、构件名称全是 `Cube.042`，想加个拾取交互或让 AGV 沿着走廊巡线，沟通修改的成本极高。
+然而长期以来，前端工程师在涉足 3D WebGL（Three.js / WebGPU）领域时，总会被两大核心难题掣肘：
+1. **工业级 3D 资产获取极难**：网上能免费下载的模型要么是缺少工业规范的游戏低模，要么是层级混乱、动辄几百兆的工业 CAD 巨石文件，无法直接在浏览器端保持 60 FPS 流畅运行；
+2. **建模与前端业务逻辑脱节**：传统流程中，3D 美术导出的模型往往构件原点全部堆在 `(0, 0, 0)`、前挡风玻璃发生剧烈深度冲突（Z-fighting）闪烁花屏、构件命名随意（全是 `Cube.087`）。前端想要挂载传感器拾取交互、实现 AGV 路径巡线，需要经历反复且漫长的返工沟通。
 
-**“如果能让 AI 懂我们的业务需求，直接操作 Blender 生成高精工业模型，再由前端工程化串联，那会怎样？”**
+**“如果让 AI Agent 充当资深 3D 建模师，通过脚本直接驱动 Blender 生成符合业务逻辑的高精资产，再由前端完成工程化装配，会碰撞出怎样的火花？”**
 
 在这篇文章中，我将手把手带大家复盘：**如何借助 AI Agent（通过 Python MCP 协议操控 Blender 建模）从零生成整座现代化智慧立体冷链仓储，并结合 Vue 3 + Vite 5 + TypeScript + Three.js 打造出支持 60 FPS 动态巡航、智能避障、空间自适应弹窗投影的工业级数字孪生管控平台，最终自动化部署上线的全过程。**
 
@@ -23,48 +23,48 @@
 
 ## 二、AI 操纵 Blender：探索 Python 脚本自动化建模
 
-传统建模方式需要 3D 美术在 Blender 中逐个拉顶点、做布尔运算、烘焙贴图。而本次我们采用的是 **AI Agent + Blender Python（`bpy`）API 协同驱动**。
+传统 3D 建模依赖美术在 Blender 图形界面中手动拉顶点、做布尔运算与贴图烘焙。而在这个项目中，我们采用了 **AI Agent + Blender Python（`bpy`）API 深度协同** 的全自动生成管线。
 
 ```mermaid
 flowchart LR
-    A[自然语言工业需求] --> B[AI Agent 规划]
-    B --> C[Blender Python MCP / bpy]
-    C --> D[参数化生成构件: 厂房/月台/货架/冷库/货车/AGV]
-    D --> E[拓扑优化与材质调校: 解决 Z-fighting]
+    A[自然语言工业构想] --> B[AI Agent 架构规划]
+    B --> C[Blender Python MCP / bpy 运行时]
+    C --> D[参数化生成: 厂房/月台/货架/冷库/货车/AGV]
+    D --> E[拓扑优化与材质调校: 根除 Z-fighting]
     E --> F[GLTF 2.0 规格导出: 1.86MB 极致模型]
 ```
 
-### 1. 架构参数化生成：从建筑到设备
+### 1. 业务驱动的参数化场景构建
 
-通过 AI 编写 Python 脚本，向 Blender 注入空间几何指令，我们快速构建了以下符合现代工业标准的核心功能区：
+通过 AI 编写 Python 自动化脚本，向 Blender 空间直接注入几何指令，精准构建出满足现代物流调度的大型工业场景：
 
-* **阶梯式剖切厂房（1.2m ~ 5.5m）**：
-  室内数字孪生最忌讳“四面墙体遮挡视野”。我们通过布尔差集和顶点切片，将靠观众侧的南墙、西墙降至 1.2m，北墙、东墙保留 5.5m 支撑梁，既有立体厂房的纵深感，又彻底杜绝了死角。
-* **3 大装卸月台（Loading Docks）与伸缩密封罩**：
-  1号泊位配备自动化伸缩滚筒输送线，2号、3号泊位停靠冷链重卡，外部保留防撞橡胶块与导向黄黑警示漆。
-* **高位立体托盘货架区 & 负压恒温冷链气密仓**：
-  立柱采用欧标实木托盘码垛（3层立体高垛），并在北侧打造全封闭双重隔离冷库（带气密风幕门与专属雪花防冻徽标）。
+* **阶梯式剖切建筑墙体（1.2m ~ 5.5m）**：
+  室内数字孪生最忌讳“封闭四壁遮挡视线”。我们利用顶点切片算法，将靠近镜头视角的南墙、西墙截断降至 1.2m，北墙、东墙则保留 5.5m 钢构支撑梁，既勾勒出通透开阔的立体厂房轮廓，又彻底消除了视线死角。
+* **3 大装卸月台（Loading Docks）与柔性密封罩**：
+  1号泊位配备自动化伸缩滚筒流水线，2号、3号出入库泊位停靠大型冷链卡车，月台外侧配备橡胶防撞缓冲块与黄黑警示漆标线。
+* **高位欧标立体货架区与恒温冷链气密仓**：
+  立垛区采用欧标实木托盘搭建 3 层立体高位密集垛，并在北侧布局全封闭气密冷库（配备红外感应风幕门与专属冷链雪花防冻标识）。
 
 ![Blender 参数化建模渲染阶段视口](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/01_blender_model.png)
 
-### 2. 踩坑与精细化拓扑修复：彻底根除 Z-Fighting
+### 2. 拓扑级优化修复：彻底根除 Z-Fighting 深度冲突
 
-在将初步模型导入浏览器渲染后，我们遭遇了一个非常经典的 3D 渲染缺陷：**卡车前挡风玻璃随着视角旋转产生剧烈的“黑白花屏闪烁”**。
+在模型初步导入 WebGL 渲染时，出现了一个典型的 3D 渲染缺陷：**卡车前挡风玻璃随着视角旋转产生剧烈的“黑白网格斑驳闪烁”（GPU 花屏）**。
 
 #### 原因剖析：
-这是典型的 **Z-fighting（深度缓冲区冲突）**。车头表面网格与挡风玻璃网格处于**完全相同的三维空间坐标平面**，GPU 在进行深度测试（Depth Test）时因浮点精度有限，无法确定哪一个面在前面，导致两者交替被渲染，产生花屏。
+这是显卡渲染中极易发生的 **Z-fighting（深度缓冲区冲突）**。车头表面外壳与挡风玻璃处于**完全重合的几何平面**，GPU 在进行深度测试（Depth Test）时，由于浮点精度限制无法判定谁在前、谁在后，导致两个材质在同一像素上疯狂争抢，引发交替闪烁。
 
-#### 修复策略（Blender Python 拓扑外推）：
-我们在 Blender 中选中挡风玻璃（`Truck_Windshield`）的顶点，**沿着面的法线方向微凸偏移 2.5cm（+0.025m）**，并在材质球中赋予微透明与菲涅尔反光，既拉开了物理深度距离，又让车窗具有了工业玻璃的立体质感。
+#### 修复策略（Blender Python 拓扑微凸外推）：
+我们在脚本中定位挡风玻璃网格（`Truck_Windshield`），**沿着几何面法线方向向外微凸偏移 2.5cm（+0.025m）**，并在材质着色器中赋予微透明与菲涅尔高光，不仅物理级拉开深度差彻底消除了闪烁，还让玻璃获得了极其逼真的高光折射感。
 
 ```python
-# Blender Python 解决卡车车窗 Z-fighting 示例
+# Blender Python 沿法线微移顶点，根治 Z-fighting
 import bpy
 
 obj = bpy.data.objects.get("Truck_Windshield")
-if obj:
+if obj and obj.type == 'MESH':
     mesh = obj.data
-    # 沿法线正方向微移 25mm，与车身物理隔离
+    # 沿法线向外微移 25mm，与车身物理隔离
     for vert in mesh.vertices:
         vert.co.z += 0.025
     mesh.update()
@@ -72,157 +72,143 @@ if obj:
 
 ![修复 Z-fighting 后的挡风玻璃立体拓扑](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/02_z_fighting_fix.png)
 
-### 3. PBR 材质烘焙与 GLTF 压缩
+### 3. PBR 材质工作流与 1.86MB 极致轻量化
 
-为了让生产页面首屏秒开，我们剔除了所有无意义的细分曲面修饰，严格控制多边形面数，并统一应用 PBR 金属度/粗糙度材质流，最后导出为单一二进制 `.glb` 文件。
+为了保证在移动端或普通笔记本浏览器中都能秒开并稳定保持 60 帧，AI 在导出前执行了一系列优化：
+1. **剔除冗余细分面**：严格限制静态工业构件的面数，保留关键几何特征；
+2. **构件语义化命名**：为所有动态节点打上规范 ID（如 `AGV_Robot_01`~`07`、`Truck_Moving_Road`、`WS_Workstation`），方便前端通过 `getObjectByName` 直接驱动；
+3. **PBR 粗糙度/金属度材质合流**：导出为标准化单一二进制 `.glb`。
 
-**最终整座包含 3 辆重卡、7 台 AGV、传送带、冷库、数百件立垛货物的复杂工业园区模型，仅占 1.86 MB！**
+**最终整座包含 3 辆重卡、7 台 AGV、传送带滚筒、气密冷库及数百件货架货物的园区模型，总体积仅 1.86 MB！**
 
 ---
 
 ## 三、前端工程化重构：Vue 3 + Vite 5 + TypeScript + Three.js
 
-有了精简的 3D 模型后，我们摒弃了把千行代码堆在单 HTML 文件的落后方式，将其全面重构为**现代化前端工程架构**。
+在拥有高质量的轻量 3D 资产后，我们告别单 HTML 脚本拼凑的落后方式，将其全面重构为**现代化前端工程架构**。
 
-### 1. 为什么选择 Vue 3 + Vite？
+### 1. 架构分层与生命周期管理
 
-* **技术栈心智契合**：大屏页面不仅有 3D 画布，还有大量 Header 气象指标、动态 KPI 胶囊横幅、悬浮控制坞、数据表格等 UI 视图，Vue 3 的 SFC（单文件组件）与 `<style scoped>` 提供了极致的样式隔离与模块化能力；
-* **3D 核心引擎与 UI 状态彻底解耦**：通过 TypeScript Class 独立封装 Three.js 渲染器，在 Vue 组件挂载（`onMounted`）时注入 DOM，在组件卸载（`onUnmounted`）时彻底销毁 WebGL 上下文，彻底告别内存泄露；
-* **极速构建与强缓存支持**：Vite 自动将 `three`、`vue` 独立分包打包，首屏体积更小。
+* **3D 核心渲染器完全解耦**：将所有 Three.js 场景、相机、光照、射线拾取与循环动画封装在纯 TypeScript Class [`WarehouseScene.ts`](https://github.com/Xxcool/smart-warehouse/blob/main/src/core/WarehouseScene.ts) 中；
+* **Vue 3 SFC 专注视图呈现**：在大屏组件挂载（`onMounted`）时绑定 Canvas 容器，在组件卸载（`onUnmounted`）时精准释放材质、几何体与 WebGL 上下文，彻底杜绝内存泄漏；
+* **极速构建与强缓存支持**：借助 Vite 5 的 Manual Chunks 特性，将 `three` 与 `vue` 自动切分为独立长期缓存包。
 
 ### 2. 目录架构一览
 
 ```text
 smart-warehouse/
 ├── public/
-│   └── smart_warehouse.glb        # 1.86MB 核心 3D 资产
+│   └── smart_warehouse.glb        # 1.86MB Blender 核心三维资产
 ├── src/
 │   ├── components/
 │   │   ├── HeaderBar.vue          # 大屏顶栏 (实时秒级时钟、气象温度、全屏)
 │   │   ├── KpiRibbon.vue          # 核心运营 KPI (吞吐量、AGV运行率、库容)
 │   │   ├── FloatingControls.vue   # 悬浮操作坞 (放大、缩小、复位、顶视、暂停)
 │   │   ├── AnchoredPopup.vue      # 3D 空间动态吸附与防越界弹窗
-│   │   └── LoadingOverlay.vue     # 109 项资源平滑渐进加载指示器
+│   │   └── LoadingOverlay.vue     # 109 项三维构件平滑加载指示器
 │   ├── core/
-│   │   ├── WarehouseScene.ts      # Three.js 渲染循环、巡线、射线拾取
+│   │   ├── WarehouseScene.ts      # 3D 核心引擎 (渲染循环、巡线、射线拾取)
 │   │   └── constants.ts           # 工业传感字典数据
 │   ├── types/
-│   │   └── warehouse.ts           # TypeScript 类型体系
+│   │   └── warehouse.ts           # TypeScript 类型声明
 │   ├── App.vue                    # 主界面装配
 │   └── main.ts
 ```
 
 ---
 
-## 四、核心技术攻坚与算法落地
+## 四、数字孪生核心技术攻坚与算法落地
 
-### 1. AGV 自主巡线与 Catmull-Rom 路径避障
+### 1. AGV 闭环正交巡线与 Catmull-Rom 路径避障
 
-在工业场景中，AGV 绝不是机械地直角瞬移，而是沿着地面埋设的磁导/激光反光板正交导引线平滑运行。
+在现代智慧仓储中，AGV 搬运小车绝不是机械地折线瞬移，而是沿着地面铺设的磁轨/激光反光标记进行平滑加减速巡线作业。
 
-#### 样条曲线平滑插值：
-我们提取了 12 个正交拐点，通过 `THREE.CatmullRomCurve3(points, true, 'centripetal', 0.05)` 生成一条首尾相接、向心平滑闭环航道。在动画主循环（`requestAnimationFrame`）中：
-1. 根据逝去时间（`accumulatedTime`）计算当前的参数 `t`（0.0 ~ 1.0）；
-2. 使用 `curve.getPointAt(t)` 获取空间平移坐标；
-3. 使用 `curve.getTangentAt(t)` 提取前向切线矢量，计算方向四元数让 AGV 车头**自动始终朝向行驶方向**。
+#### 向心样条曲线平滑插值：
+我们定义了 12 个正交拐点坐标，通过 `THREE.CatmullRomCurve3(points, true, 'centripetal', 0.05)` 构筑一条首尾相接、向心平滑的闭环轨迹。在主渲染帧（`requestAnimationFrame`）中：
+1. 根据物理逝去时间计算各小车的归一化巡航进度 `t`（0.0 ~ 1.0）；
+2. 调用 `curve.getPointAt(t)` 计算空间三维坐标；
+3. 调用 `curve.getTangentAt(t)` 提取前向切线矢量，计算四元数让 AGV 车头**始终实时对齐运动切线方向**。
 
 ```typescript
-// AGV 沿导引线平滑差速巡线计算
+// AGV 沿正交导引线平滑差速巡线算法
 const t = (this.accumulatedTime * 0.035 + item.offset) % 1.0;
 const pt = this.agvCurve.getPointAt(t);
 const tangent = this.agvCurve.getTangentAt(t);
 
 item.node.position.set(pt.x, 0.1, pt.z);
-// 航向切线对齐
+// 实时朝向与路径切线对齐
 const dir = new THREE.Vector3(tangent.x, 0, tangent.z).normalize();
 item.node.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
 ```
 
-#### 南区托盘货架避障踩坑实战：
-在早期测试中，AGV 行驶到南侧走廊时会“压过”存放货物的托盘。我们通过获取模型各实体的精确边界盒发现：
-* 分拣工作台最南端坐标为 `Z = 4.18`；
+#### 南区货架避障避碰实战：
+在开发过程中，我们发现 AGV 行驶到南侧通道时会直接穿过暂存托盘货垛。通过获取实体精确的世界包围盒（BoundingBox），我们计算出：
+* 中央分拣工作台最南端坐标为 `Z = 4.18`；
 * 南区暂存立垛最北端坐标为 `Z = 5.91`；
-* 两者之间存在一个宽度为 `1.73m` 的净空走廊通道。
+* 两者之间实际存在一条宽度为 `1.73m` 的净空走廊通道。
 
-我们将南侧航道的拐点精确修正为 `Z = 4.95`，刚好位于正中通道，与两侧设备均保留了超过 **0.6m 的工业安全避让余量**，完美解决了压线穿模！
+我们将南侧航道的坐标点严格校准为 `Z = 4.95`，刚好位于正中间中线，与两侧货垛与工作台均保持了 **0.61m 的安全避让距离**，彻底解决了碾压货物的 BUG。
 
 ![AGV 巡线航道与避障通道精确对齐](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/03_agv_route_planning.png)
 
-### 2. 空间射线拾取与自适应 3D 锚定弹窗
+### 2. 多源异构设备协同动态孪生
 
-点击 3D 厂房中的任意电脑、托盘堆、冷库气密门、AGV 或卡车，需要弹出对应设备的实时传感器数据。
+一个真正鲜活的数字孪生系统，必须具备多设备并发运动仿真能力：
 
-#### 核心投影算法：
-1. **Raycaster 碰撞检测**：获取点击点在世界坐标系中的空间位置 `hit.point`；
-2. **三维转二维（Vector3.project）**：将世界坐标向量投影到相机裁剪空间，再映射为屏幕实际像素坐标 `(rawX, rawY)`；
+* **外部干线公路重卡巡航（Highway Heavy Truck Cruise）**：
+  在园区外侧直行干道（`X = 28.5m`）部署动态干线物流车，设定 50m 闭环线性行驶区间，车速与车轮自转角速度严格联动，且与出库月台停靠车辆保持近 3 米安全工业车距，杜绝车头相撞；
+* **1号月台伸缩滚筒自动化物料流（Conveyor Belt Stream）**：
+  在滚筒线上生成 6 组错峰偏移的货箱队列，匀速从卡车尾门驳运至分拣操作台，形成川流不息的自动化出入库流；
+* **7 台 AGV 集群差速作业**：
+  每台小车设置相差 `1/7` 的初始相位偏置，在环形主干道上形成错落有致的作业集群，模拟多机协同作业调度。
+
+### 3. 空间射线拾取与自适应 3D 锚定弹窗
+
+点击 3D 场景中的任意电脑、托盘堆、冷库气密门、AGV 或卡车，需要弹出对应设备的实时传感器与运行态数据卡片。
+
+#### 核心投影与防越界算法：
+1. **Raycaster 碰撞拾取**：获取点击点在三维世界中的精确坐标 `hit.point`；
+2. **三维转二维（Vector3.project）**：将世界坐标向量经由相机投影矩阵转换至裁剪空间，再映射为屏幕实际像素坐标 `(rawX, rawY)`；
 3. **优先正上方（Placement-Top）与智能下翻**：
-   - 默认将卡片放置于物体的正上方，便于操作者视线向下聚焦物体；
-   - 当物体过于贴近屏幕顶栏时（上方可用空间小于 45px），卡片自动翻转至物体下方；
-4. **水平与垂直视口弹性吸附（Clamping）**：
-   卡片宽度固定 320px，通过数学公式严密限制卡片左右与下边界，确保在任何屏幕分辨率下卡片 100% 完整显示、绝对不超出可视区域！
+   - 默认将卡片锚定在点击目标的正上方，符合操作者视线自然向下聚焦物体的工业人机工效；
+   - 当物体过于贴近屏幕顶栏时（上方可用空间小于 45px），卡片自动智能翻转至物体下方；
+4. **视口弹性吸附（Viewport Clamping）**：
+   卡片宽度严格固定 320px，通过数学边界限制，确保在任何屏幕尺寸下卡片 100% 完整呈现在视口内、绝对不超出屏幕可视区域！
 
 ```typescript
-// 屏幕投影与视口防越界算法核心
+// 屏幕投影与视口防越界算法
 tempProjVec.project(camera);
 
-// 转换屏幕物理像素
+// 映射屏幕物理像素
 const rawX = (tempProjVec.x * 0.5 + 0.5) * window.innerWidth;
 const rawY = (-(tempProjVec.y * 0.5) + 0.5) * window.innerHeight;
 
 // 优先顶部放置，空间不足自动翻转至下方
 const isBottom = rawY < safeTop + 45;
 
-// 水平边界防溢出裁剪
+// 水平边界弹性吸附，绝不溢出屏幕
 const halfW = 160;
 const clampedX = Math.max(safeLeft + halfW, Math.min(safeRight - halfW, rawX));
 
-// 动态小三角箭头偏移补偿 (精准指向实际点击原点)
+// 动态小三角指示箭头偏移补偿 (精准指向三维实际点击点)
 const caretOffset = rawX - clampedX;
 ```
 
-### 3. 字体与排版避坑：全角摄氏度 ℃ 挤压畸变
+### 4. 纯 WebGL 相机 Dolly 缩放，杜绝破坏 HUD 精度
 
-在界面调优过程中，我们发现气象区的温度 `24℃` 在 macOS 上渲染出来异常瘦长、像被“严重挤压”了一样。
+普通网页缩放（Pinch-to-zoom 或 Ctrl+滚轮）会把网页文字、顶栏、弹窗卡片一同缩放，导致大屏 UI 模糊变形、布局破碎。
 
-#### 原因揭秘：
-全角符号 `℃`（Unicode `U+2103`）属于中日韩（CJK）兼容字形。如果父元素设置了等宽西文字体（`ui-monospace, monospace`），系统英文字体中并不包含这个字符，就会从备用中文字体中拉取，并**强行压进单个半角字母的网格宽度**，从而产生严重挤压畸变！
-
-#### 终极解决方案：
-将全角 `℃` 规范拆解为现代无衬线西文字体下的 **度数符 `°` + 大写字母 `C`**：
-```html
-<span class="weather-temp">24<span class="temp-unit">°C</span></span>
-```
-```css
-.weather-temp {
-  color: #0284c7;
-  font-size: 16px;
-  font-weight: 700;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  display: inline-flex;
-  align-items: baseline;
-}
-.weather-temp .temp-unit {
-  font-size: 13px;
-  margin-left: 2px;
-}
-```
-字形瞬间舒展优雅，跨平台渲染保持 100% 一致。
-
-### 4. 纯 WebGL 相机 Dolly 缩放，杜绝浏览器视口缩放
-
-普通网页缩放（Pinch-to-zoom 或 Ctrl+滚轮）会把网页字体、弹窗、顶栏一起放大，导致大屏 UI 严重糊掉、布局错乱。
-
-我们通过全局拦截原生 `gesturestart`、`gesturechange` 与 `wheel` 事件，将每一次手势转化为 **三维摄像机沿视准轴向的前后 Dolly 位移**：
-* 网页 DOM UI 元素始终维持精准物理像素；
-* 只有三维世界中的仓库模型在拉近拉远，操作手感丝滑媲美桌面专业 CAD 软件。
+我们全局拦截了浏览器的原生手势与滚轮事件，将每一次缩放操作转化为 **三维摄像机沿视准轴向的前后 Dolly 位移**：
+* 顶栏 Header、KPI 胶囊、操作坞与弹窗等 DOM 元素始终维持精准物理像素；
+* 只有三维世界中的仓库模型拉近拉远，操作手感丝滑媲美专业桌面 CAD 软件。
 
 ---
 
-## 五、全球 CDN 极速部署：Vercel 静态强缓存调优
+## 五、全球 CDN 极速部署：Vercel 生产强缓存调优
 
-在完成本地开发与构建后，我们通过 GitHub Actions 与 Vercel 实现了自动化 CI/CD。
+在完成代码构建后，我们通过 GitHub 与 Vercel 实现了自动化持续集成与部署。
 
-为了让近 2MB 的 `.glb` 模型在生产环境中秒级加载，我们在 `vercel.json` 中配置了特定的 MIME 类型与不可变强缓存：
+为了让近 2MB 的 `.glb` 3D 模型资产在全球范围内秒级加载，我们在 `vercel.json` 中配置了特定的 MIME 类型与跨域强缓存：
 
 ```json
 {
@@ -244,27 +230,27 @@ const caretOffset = rawX - clampedX;
 }
 ```
 
-* **Content-Type 修正**：指定 `model/gltf-binary`，防止某些浏览器因默认 `application/octet-stream` 而阻断流式解析；
-* **强缓存加速**：设置 `max-age=31536000, immutable`，用户二次访问直接命中本地内存/磁盘缓存，0 毫秒加载模型！
+* **MIME 规范化**：显式声明 `model/gltf-binary`，防止部分浏览器因解析为通用字节流而阻塞流式几何解析；
+* **Immutable 强缓存**：设置 `max-age=31536000, immutable`，用户后续访问直接从浏览器本地磁盘缓存秒开，无需二次网络请求！
 
 ---
 
 ## 六、结语与全栈思考
 
-回顾整个项目，从一个想法到最终可交付的工业级数字孪生大屏：
+回顾整个项目的推进过程：
 
 ```text
-自然语言工业构想 
+工业自然语言构想 
   ➔ AI Agent 自动化 Python 驱动 Blender 建模 (bpy)
-  ➔ 拓扑级优化修复 (消灭 Z-fighting、轻量化 PBR 烘焙至 1.86MB)
+  ➔ 拓扑级优化修复 (根除 Z-fighting、轻量化 PBR 烘焙至 1.86MB)
   ➔ Vue 3 + Vite 5 + TypeScript + Three.js 现代化前端工程化封装
   ➔ Catmull-Rom 导引样条路径规划 + 空间射线拾取 + 动态防越界投影
   ➔ Vercel 全球边缘 CDN 毫秒级交付
 ```
 
-在 AI Agent 时代的浪潮下，**“前端开发”的边界正在被无限拓宽**。我们不再受限于“别人给什么模型我们就凑合做什么”，而是能够以一人之力贯通 3D 资产生成、工业级渲染调优、状态解耦与全栈交付的全流程。
+在 AI Agent 浪潮下，**“前端 3D 开发”的技术边界正在被彻底重构**。我们不再需要漫长等待外部建模团队的支持，而是能通过 AI 自动化脚本快速生成高精模型，并以一人之力贯通 3D 资产生成、工业级渲染调优、状态解耦与全球交付的全流程。
 
-希望这篇实战沉淀能为你带来启发！欢迎在评论区交流讨论，也欢迎给开源项目点个 Star 支持一下：
+希望这篇硬核实战复盘能为大家探索 Web 3D 与数字孪生产生启发！欢迎在评论区交流讨论，也欢迎给开源项目点个 Star 支持一下：
 
 - 🎮 **线上可玩 Demo**：[smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)
 - 💻 **GitHub 源码**：[github.com/Xxcool/smart-warehouse](https://github.com/Xxcool/smart-warehouse)
