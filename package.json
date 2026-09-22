@@ -2,7 +2,7 @@
   "name": "smart-warehouse",
   "version": "1.0.0",
   "private": false,
-  "description": "3D 智能立体冷链与智慧仓储物流数字孪生管控大屏 (Vue 3 + Vite + TypeScript + Three.js + Blender)",
+  "description": "3D 智慧仓储数字孪生平台 (Vue 3 + Vite + TypeScript + Three.js + Blender)",
   "type": "module",
   "scripts": {
     "dev": "vite --port 8088",

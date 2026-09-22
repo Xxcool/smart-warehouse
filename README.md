@@ -1,5 +1,5 @@
-# 3D 智能立体冷链与智慧仓储数字孪生管控平台 (smart-warehouse)
-> **Smart Cold-Chain & Logistics Digital Twin Management Platform**
+# 智慧仓储数字孪生平台 (smart-warehouse)
+> **Smart Warehouse Digital Twin Platform**
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-success?style=for-the-badge&logo=vercel)](https://smart-warehouse-wine.vercel.app)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883?style=for-the-badge&logo=vuedotjs)](https://vuejs.org/)

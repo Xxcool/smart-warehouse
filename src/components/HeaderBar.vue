@@ -9,17 +9,17 @@
         <span class="live-tag">LIVE 实时孪生</span>
       </div>
       <div class="brand-info">
-        <div class="brand-hub">智慧冷链仓储物流自动化中心</div>
+        <div class="brand-hub">自动化仓储运营中心</div>
         <div class="brand-code">NODE #WH-A01 · 60 FPS 动态孪生</div>
       </div>
     </div>
 
     <!-- 中间：平台主标题与科技装饰轨 -->
     <div class="header-center-group">
-      <div class="main-title">智能立体冷链与智慧仓储数字孪生管控平台</div>
+      <div class="main-title">智慧仓储数字孪生平台</div>
       <div class="sub-title-track">
         <span class="track-deco-left"></span>
-        <span class="sub-title">SMART COLD-CHAIN & LOGISTICS DIGITAL TWIN MANAGEMENT CENTER</span>
+        <span class="sub-title">SMART WAREHOUSE DIGITAL TWIN PLATFORM</span>
         <span class="track-deco-right"></span>
       </div>
     </div>
