@@ -1,6 +1,15 @@
 # 3D 智能立体冷链与智慧仓储数字孪生管控平台 (smart-warehouse)
 > **Smart Cold-Chain & Logistics Digital Twin Management Platform**
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-success?style=for-the-badge&logo=vercel)](https://smart-warehouse-wine.vercel.app)
+[![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883?style=for-the-badge&logo=vuedotjs)](https://vuejs.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646cff?style=for-the-badge&logo=vite)](https://vitejs.dev/)
+[![Three.js](https://img.shields.io/badge/Three.js-r169-black?style=for-the-badge&logo=threedotjs)](https://threejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+🔗 **公网在线体验地址 (Live Demo)**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)
+
 一个基于 **Vue 3 + Vite + TypeScript + Three.js** 与 **Blender 5.2.2 LTS 高精建模** 的现代化工业级 3D 智慧物流与冷链数字孪生管控大屏系统。
 
 ---
