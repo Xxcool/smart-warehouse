@@ -1,4 +1,4 @@
-# 一人即团队！基于 AI Agent + Blender + Vue 3 + Three.js 的工业级 3D 智慧仓储数字孪生全栈实战
+# AI 建模 + Three.js：打造工业级智慧仓储数字孪生
 
 > **项目在线体验 (Live Demo)**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)  
 > **开源代码仓库 (GitHub)**：[https://github.com/Xxcool/smart-warehouse](https://github.com/Xxcool/smart-warehouse)
