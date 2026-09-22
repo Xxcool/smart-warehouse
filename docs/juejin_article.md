@@ -1,4 +1,4 @@
-# AI 建模 + Three.js：打造工业级智慧仓储数字孪生
+# Antigravity + Blender MCP：打造 3D 智慧仓储数字孪生
 
 > **项目在线体验 (Live Demo)**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)  
 > **开源代码仓库 (GitHub)**：[https://github.com/Xxcool/smart-warehouse](https://github.com/Xxcool/smart-warehouse)
@@ -13,33 +13,49 @@
 1. **工业级 3D 资产获取极难**：网上能免费下载的模型要么是缺少工业规范的游戏低模，要么是层级混乱、动辄几百兆的工业 CAD 巨石文件，无法直接在浏览器端保持 60 FPS 流畅运行；
 2. **建模与前端业务逻辑脱节**：传统流程中，3D 美术导出的模型往往构件原点全部堆在 `(0, 0, 0)`、前挡风玻璃发生剧烈深度冲突（Z-fighting）闪烁花屏、构件命名随意（全是 `Cube.087`）。前端想要挂载传感器拾取交互、实现 AGV 路径巡线，需要经历反复且漫长的返工沟通。
 
-**“如果让 AI Agent 充当资深 3D 建模师，通过脚本直接驱动 Blender 生成符合业务逻辑的高精资产，再由前端完成工程化装配，会碰撞出怎样的火花？”**
+**“如果让 AI Agent 充当资深 3D 建模师，通过 MCP 协议直接操纵 Blender 生成符合业务逻辑的高精资产，再由前端完成工程化装配，会碰撞出怎样的火花？”**
 
-在这篇文章中，我将手把手带大家复盘：**如何借助 AI Agent（通过 Python MCP 协议操控 Blender 建模）从零生成整座现代化智慧立体冷链仓储，并结合 Vue 3 + Vite 5 + TypeScript + Three.js 打造出支持 60 FPS 动态巡航、智能避障、空间自适应弹窗投影的工业级数字孪生管控平台，最终自动化部署上线的全过程。**
+在这篇文章中，我将手把手带大家复盘：**如何借助 Google Antigravity 原生集成的 Blender MCP（Model Context Protocol）工具链，无需手动写 Python 脚本，以全自动“代码生成 + 视口截屏校验 + 拓扑修复”的 Agentic 闭环生成整座工业园区，并结合 Vue 3 + Vite 5 + TypeScript + Three.js 打造出支持 60 FPS 动态巡航、智能避障、空间自适应弹窗投影的工业级数字孪生管控平台的全过程。**
 
 ![3D 智慧仓储数字孪生管控大屏全貌](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/04_final_digital_twin.png)
 
 ---
 
-## 二、AI 操纵 Blender：探索 Python 脚本自动化建模
+## 二、告别手动建模：Antigravity 如何通过 Blender MCP 实现自动化建模？
 
-传统 3D 建模依赖美术在 Blender 图形界面中手动拉顶点、做布尔运算与贴图烘焙。而在这个项目中，我们采用了 **AI Agent + Blender Python（`bpy`）API 深度协同** 的全自动生成管线。
+传统 3D 建模流程中，开发者要么依赖美术手动建模，要么自己写 Python 脚本在 Blender 命令行或内置文本编辑器里手动调试运行，效率极低且无法形成自动化闭环。
+
+在本项目中，我们采用了 **Antigravity + Blender MCP Server** 的自动化建模架构。
 
 ```mermaid
-flowchart LR
-    A[自然语言工业构想] --> B[AI Agent 架构规划]
-    B --> C[Blender Python MCP / bpy 运行时]
-    C --> D[参数化生成: 厂房/月台/货架/冷库/货车/AGV]
-    D --> E[拓扑优化与材质调校: 根除 Z-fighting]
-    E --> F[GLTF 2.0 规格导出: 1.86MB 极致模型]
+flowchart TD
+    A[开发者自然语言业务需求] --> B[Google Antigravity Agent]
+    subgraph Blender_MCP_Tools [Blender MCP 自动化双向控制工具链]
+        B -->|1. execute_blender_code| C[Blender 3D 引擎环境]
+        C -->|2. get_scene_info / get_object_info| B
+        C -->|3. get_viewport_screenshot 视口图像反馈| B
+        B -->|4. 视觉校验与拓扑修复| C
+        C -->|5. export_scene 自动化导出| D[1.86MB 生产级 GLB 资产]
+    end
+    D --> E[Vue 3 + Three.js 前端数字孪生大屏]
 ```
 
-### 1. 业务驱动的参数化场景构建
+### 1. 什么是 Blender MCP？
 
-通过 AI 编写 Python 自动化脚本，向 Blender 空间直接注入几何指令，精准构建出满足现代物流调度的大型工业场景：
+**MCP（Model Context Protocol，模型上下文协议）** 允许 Antigravity 突破纯文本代码的限制，直接获得对宿主 3D 软件的“感知与控制能力”。挂载 Blender MCP 插件后，Antigravity 原生拥有了多项高维 3D 操纵工具：
+* `execute_blender_code`：直接向 Blender 发送场景生成、几何布尔、材质赋予与灯光布置等空间操作；
+* `get_viewport_screenshot`：**赋予 AI “视觉观察能力”**，实时捕获 Blender 视口截图，AI 自主检查模型比例、材质反光与摄像机视角；
+* `get_scene_info` / `get_object_info`：毫秒级内省当前场景的构件层级树、顶点面数、边界盒与空间坐标；
+* `export_scene`：完成优化后直接导出标准 GLTF/GLB 资产。
+
+开发者**无需配置任何 Python 建模环境或手动执行脚本**，只需在 Antigravity 中描述场景需求，AI 即可在后台自主完成几何体生成与视觉闭环。
+
+### 2. 参数化场景构建：从建筑到设备
+
+借助 Blender MCP 工具链，Antigravity 自主对 Blender 发出指令，构建出满足现代物流调度的大型工业场景：
 
 * **阶梯式剖切建筑墙体（1.2m ~ 5.5m）**：
-  室内数字孪生最忌讳“封闭四壁遮挡视线”。我们利用顶点切片算法，将靠近镜头视角的南墙、西墙截断降至 1.2m，北墙、东墙则保留 5.5m 钢构支撑梁，既勾勒出通透开阔的立体厂房轮廓，又彻底消除了视线死角。
+  室内数字孪生最忌讳“封闭四壁遮挡视线”。Antigravity 在 Blender 中通过顶点切片算法，将靠近镜头视角的南墙、西墙截断降至 1.2m，北墙、东墙则保留 5.5m 钢构支撑梁，既勾勒出通透开阔的立体厂房轮廓，又彻底消除了视线死角。
 * **3 大装卸月台（Loading Docks）与柔性密封罩**：
   1号泊位配备自动化伸缩滚筒流水线，2号、3号出入库泊位停靠大型冷链卡车，月台外侧配备橡胶防撞缓冲块与黄黑警示漆标线。
 * **高位欧标立体货架区与恒温冷链气密仓**：
@@ -47,24 +63,24 @@ flowchart LR
 
 ![Blender 参数化建模渲染阶段视口](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/01_blender_model.png)
 
-### 2. 拓扑级优化修复：彻底根除 Z-Fighting 深度冲突
+### 3. Agent 视觉校验与拓扑修复：彻底根除 Z-Fighting 深度冲突
 
-在模型初步导入 WebGL 渲染时，出现了一个典型的 3D 渲染缺陷：**卡车前挡风玻璃随着视角旋转产生剧烈的“黑白网格斑驳闪烁”（GPU 花屏）**。
+在模型导出后的渲染测试中，出现了一个典型的 3D 渲染缺陷：**卡车前挡风玻璃随着视角旋转产生剧烈的“黑白网格斑驳闪烁”（GPU 深度撕裂）**。
 
 #### 原因剖析：
 这是显卡渲染中极易发生的 **Z-fighting（深度缓冲区冲突）**。车头表面外壳与挡风玻璃处于**完全重合的几何平面**，GPU 在进行深度测试（Depth Test）时，由于浮点精度限制无法判定谁在前、谁在后，导致两个材质在同一像素上疯狂争抢，引发交替闪烁。
 
-#### 修复策略（Blender Python 拓扑微凸外推）：
-我们在脚本中定位挡风玻璃网格（`Truck_Windshield`），**沿着几何面法线方向向外微凸偏移 2.5cm（+0.025m）**，并在材质着色器中赋予微透明与菲涅尔高光，不仅物理级拉开深度差彻底消除了闪烁，还让玻璃获得了极其逼真的高光折射感。
+#### 修复策略（Antigravity 拓扑微凸外推）：
+Antigravity 通过 MCP 工具捕获视口截图发现缺陷后，再次调用 `execute_blender_code` 定位挡风玻璃网格（`Truck_Windshield`），**沿着几何面法线方向向外微凸偏移 2.5cm（+0.025m）**，并在材质着色器中赋予微透明与菲涅尔高光，不仅物理级拉开深度差彻底消除了闪烁，还让玻璃获得了极其逼真的高光折射感。
 
 ```python
-# Blender Python 沿法线微移顶点，根治 Z-fighting
+# Antigravity 通过 Blender MCP 执行拓扑修复示例
 import bpy
 
 obj = bpy.data.objects.get("Truck_Windshield")
 if obj and obj.type == 'MESH':
     mesh = obj.data
-    # 沿法线向外微移 25mm，与车身物理隔离
+    # 沿法线正方向微移 25mm，与车身物理隔离
     for vert in mesh.vertices:
         vert.co.z += 0.025
     mesh.update()
@@ -72,9 +88,9 @@ if obj and obj.type == 'MESH':
 
 ![修复 Z-fighting 后的挡风玻璃立体拓扑](https://raw.githubusercontent.com/Xxcool/smart-warehouse/main/docs/images/02_z_fighting_fix.png)
 
-### 3. PBR 材质工作流与 1.86MB 极致轻量化
+### 4. PBR 材质工作流与 1.86MB 极致轻量化
 
-为了保证在移动端或普通笔记本浏览器中都能秒开并稳定保持 60 帧，AI 在导出前执行了一系列优化：
+为了保证在移动端或普通笔记本浏览器中都能秒开并稳定保持 60 帧，Antigravity 在调用 `export_scene` 前执行了一系列自动化优化：
 1. **剔除冗余细分面**：严格限制静态工业构件的面数，保留关键几何特征；
 2. **构件语义化命名**：为所有动态节点打上规范 ID（如 `AGV_Robot_01`~`07`、`Truck_Moving_Road`、`WS_Workstation`），方便前端通过 `getObjectByName` 直接驱动；
 3. **PBR 粗糙度/金属度材质合流**：导出为标准化单一二进制 `.glb`。
@@ -85,7 +101,7 @@ if obj and obj.type == 'MESH':
 
 ## 三、前端工程化重构：Vue 3 + Vite 5 + TypeScript + Three.js
 
-在拥有高质量的轻量 3D 资产后，我们告别单 HTML 脚本拼凑的落后方式，将其全面重构为**现代化前端工程架构**。
+在 Antigravity 自动化输出高质量轻量 3D 资产后，项目全面重构为**现代化前端工程架构**。
 
 ### 1. 架构分层与生命周期管理
 
@@ -241,14 +257,14 @@ const caretOffset = rawX - clampedX;
 
 ```text
 工业自然语言构想 
-  ➔ AI Agent 自动化 Python 驱动 Blender 建模 (bpy)
+  ➔ Google Antigravity + Blender MCP 自动化闭环建模 (无需手动写脚本)
   ➔ 拓扑级优化修复 (根除 Z-fighting、轻量化 PBR 烘焙至 1.86MB)
   ➔ Vue 3 + Vite 5 + TypeScript + Three.js 现代化前端工程化封装
   ➔ Catmull-Rom 导引样条路径规划 + 空间射线拾取 + 动态防越界投影
   ➔ Vercel 全球边缘 CDN 毫秒级交付
 ```
 
-在 AI Agent 浪潮下，**“前端 3D 开发”的技术边界正在被彻底重构**。我们不再需要漫长等待外部建模团队的支持，而是能通过 AI 自动化脚本快速生成高精模型，并以一人之力贯通 3D 资产生成、工业级渲染调优、状态解耦与全球交付的全流程。
+在 AI Agent 浪潮下，**“前端 3D 开发”的技术边界正在被彻底重构**。通过 Antigravity 搭载 Blender MCP，开发者不再需要手动去配置和编写复杂的 Python 建模脚本，更无需漫长等待外部 3D 团队支援，而是能以一人之力贯通 3D 资产生成、工业级渲染调优、状态解耦与全球交付的全流程。
 
 希望这篇硬核实战复盘能为大家探索 Web 3D 与数字孪生产生启发！欢迎在评论区交流讨论，也欢迎给开源项目点个 Star 支持一下：
 
