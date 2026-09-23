@@ -185,6 +185,12 @@ onMounted(async () => {
       if (window.location.search.includes('view=screen')) {
         sceneInstance.focusHoloScreen();
       }
+      if (window.location.search.includes('focus=truck')) {
+        sceneInstance.focusOnEntity('truck_dock2', [20.04, 1.5, 3.0]);
+      }
+      if (window.location.search.includes('focus=cockpit')) {
+        sceneInstance.focusOnTruckCockpit();
+      }
       if (window.location.search.includes('preview=popup')) {
         (window as any).__showEntityPopup?.('pc_workstation');
       }
