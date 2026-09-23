@@ -36,6 +36,10 @@ export class WarehouseScene {
   private exteriorGroundMesh: THREE.Mesh | null = null;
   private truckRoadMesh: THREE.Mesh | null = null;
   private roadStripesMesh: THREE.Mesh | null = null;
+  private warehouseFloorMesh: THREE.Mesh | null = null;
+  private cargoLineMeshes: THREE.Mesh[] = [];
+  private glassWallMeshes: THREE.Mesh[] = [];
+  private mullionMeshes: THREE.Mesh[] = [];
   private ambientLight: THREE.AmbientLight | null = null;
   private hemiLight: THREE.HemisphereLight | null = null;
   private sunLight: THREE.DirectionalLight | null = null;
@@ -242,7 +246,7 @@ export class WarehouseScene {
   public loadModel(onProgress?: (percent: number, items: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       const gltfLoader = new GLTFLoader();
-      const modelUrl = '/smart_warehouse.glb';
+      const modelUrl = '/smart_warehouse.glb?v=2.2.0';
 
       gltfLoader.load(
         modelUrl,
@@ -263,6 +267,7 @@ export class WarehouseScene {
               if (n.startsWith('Glass_')) {
                 child.castShadow = false;
                 child.receiveShadow = false;
+                this.glassWallMeshes.push(child as THREE.Mesh);
                 (child as THREE.Mesh).material = new THREE.MeshPhysicalMaterial({
                   color: 0x88c2f5,
                   transparent: true,
@@ -277,6 +282,11 @@ export class WarehouseScene {
                   depthWrite: false,
                   side: THREE.DoubleSide
                 });
+              } else if (n.startsWith('Mullion_')) {
+                // 1.1 玻璃幕墙深色高刚性金属立柱与横梁骨架
+                this.mullionMeshes.push(child as THREE.Mesh);
+                child.castShadow = true;
+                child.receiveShadow = true;
               } else if (n.startsWith('AGV_Trajectory_Laser_Line')) {
                 // 2. AGV 轨迹中心高亮发光线
                 child.castShadow = false;
@@ -302,22 +312,24 @@ export class WarehouseScene {
                   side: THREE.DoubleSide
                 });
               } else if (n.startsWith('Cargo_Line_')) {
-                // 2.3 货物存储区/托盘定置区工业安全黄色标线 (与 AGV 行驶轨迹清晰区分)
+                // 2.3 货物存储区/托盘定置区工业 5S 琥珀黄色标线 (与 AGV 行驶轨迹清晰区分)
                 child.castShadow = false;
                 child.receiveShadow = false;
+                child.renderOrder = 4;
+                child.position.y += 0.015; // 抬高15mm杜绝与地面共面 Z-fighting
                 (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-                  color: 0xf59e0b
+                  color: 0xf59e0b,
+                  polygonOffset: true,
+                  polygonOffsetFactor: -3,
+                  polygonOffsetUnits: -3,
+                  depthTest: true
                 });
+                this.cargoLineMeshes.push(child as THREE.Mesh);
               } else if (n === 'Warehouse_Floor') {
-                // 3. 高反光深灰蓝镜面地坪 (与 cover.jpg 质感对齐)
+                // 3. 高反光地坪 (由 setTheme 根据当前模式统一着色与高光设定)
+                this.warehouseFloorMesh = child as THREE.Mesh;
                 child.castShadow = false;
                 child.receiveShadow = true;
-                const fMat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-                if (fMat) {
-                  fMat.color.setHex(0x131924);
-                  fMat.roughness = 0.20;
-                  fMat.metalness = 0.28;
-                }
               } else if (n === 'Exterior_Ground') {
                 this.exteriorGroundMesh = child as THREE.Mesh;
                 child.castShadow = false;
@@ -494,6 +506,42 @@ export class WarehouseScene {
         this.fillLight.color.setHex(0x00f0ff);
       }
 
+      if (this.warehouseFloorMesh && (this.warehouseFloorMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.warehouseFloorMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0x101726); // 高反光深灰蓝赛博地坪
+        mat.roughness = 0.20;
+        mat.metalness = 0.30;
+      }
+      this.glassWallMeshes.forEach((mesh) => {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: 0x88c2f5,
+          transparent: true,
+          opacity: 0.32,
+          roughness: 0.05,
+          metalness: 0.06,
+          transmission: 0.90,
+          ior: 1.50,
+          reflectivity: 0.65,
+          clearcoat: 0.85,
+          clearcoatRoughness: 0.06,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        });
+      });
+      this.mullionMeshes.forEach((mesh) => {
+        if (mesh.material && (mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+          const mat = mesh.material as THREE.MeshStandardMaterial;
+          mat.color.setHex(0x141f2e);
+          mat.roughness = 0.25;
+          mat.metalness = 0.75;
+        }
+      });
+      this.cargoLineMeshes.forEach((mesh) => {
+        if (mesh.material && (mesh.material as THREE.MeshBasicMaterial).isMeshBasicMaterial) {
+          (mesh.material as THREE.MeshBasicMaterial).color.setHex(0xf59e0b); // 5S 琥珀工业黄
+        }
+      });
+
       if (this.exteriorGroundMesh && (this.exteriorGroundMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.exteriorGroundMesh.material as THREE.MeshStandardMaterial;
         mat.color.setHex(0x0e1522);
@@ -535,6 +583,39 @@ export class WarehouseScene {
         this.fillLight.intensity = 0.45;
         this.fillLight.color.setHex(0xd9e8f8);
       }
+
+      if (this.warehouseFloorMesh && (this.warehouseFloorMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.warehouseFloorMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0xe2e8f0); // 明亮展厅素雅浅灰微光地坪
+        mat.roughness = 0.42;
+        mat.metalness = 0.08;
+      }
+      this.glassWallMeshes.forEach((mesh) => {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: 0xc8e0f8,
+          transparent: true,
+          opacity: 0.25,
+          roughness: 0.12,
+          metalness: 0.04,
+          transmission: 0.92,
+          ior: 1.48,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        });
+      });
+      this.mullionMeshes.forEach((mesh) => {
+        if (mesh.material && (mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+          const mat = mesh.material as THREE.MeshStandardMaterial;
+          mat.color.setHex(0x334155);
+          mat.roughness = 0.40;
+          mat.metalness = 0.45;
+        }
+      });
+      this.cargoLineMeshes.forEach((mesh) => {
+        if (mesh.material && (mesh.material as THREE.MeshBasicMaterial).isMeshBasicMaterial) {
+          (mesh.material as THREE.MeshBasicMaterial).color.setHex(0xd97706); // 展厅高反差工业暖黄标线
+        }
+      });
 
       if (this.exteriorGroundMesh && (this.exteriorGroundMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.exteriorGroundMesh.material as THREE.MeshStandardMaterial;
