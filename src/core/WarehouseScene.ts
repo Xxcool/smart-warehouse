@@ -151,7 +151,8 @@ export class WarehouseScene {
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
-    this.sunLight.shadow.bias = -0.00012;
+    this.sunLight.shadow.bias = -0.0002;
+    this.sunLight.shadow.normalBias = 0.025;
     this.sunLight.shadow.camera.left = -32;
     this.sunLight.shadow.camera.right = 32;
     this.sunLight.shadow.camera.top = 32;
@@ -795,17 +796,46 @@ export class WarehouseScene {
                       meshObj.material = truckGlass;
                     }
                   } else if (m.name === 'Mat_Screen_Glow') {
-                    const ledLight = new THREE.MeshStandardMaterial({
-                      color: 0xffffff,
-                      emissive: new THREE.Color(0x38bdf8),
-                      emissiveIntensity: 3.5,
-                      roughness: 0.1,
-                      metalness: 0.2
+                    // 自发光天青色液晶屏与前大灯/雾灯：BasicMaterial 无阴影接收，配合 polygonOffset 彻底杜绝共面与自阴影闪烁
+                    const ledLight = new THREE.MeshBasicMaterial({
+                      color: 0x67e8f9,
+                      polygonOffset: true,
+                      polygonOffsetFactor: -3,
+                      polygonOffsetUnits: -3,
+                      toneMapped: false
                     });
                     if (Array.isArray(meshObj.material)) {
                       (meshObj.material as THREE.Material[])[idx] = ledLight;
                     } else {
                       meshObj.material = ledLight;
+                    }
+                  } else if (m.name === 'Mat_TailLight_Glow') {
+                    // 真实工业高亮红宝石尾灯
+                    const redLed = new THREE.MeshBasicMaterial({
+                      color: 0xf43f5e,
+                      polygonOffset: true,
+                      polygonOffsetFactor: -3,
+                      polygonOffsetUnits: -3,
+                      toneMapped: false
+                    });
+                    if (Array.isArray(meshObj.material)) {
+                      (meshObj.material as THREE.Material[])[idx] = redLed;
+                    } else {
+                      meshObj.material = redLed;
+                    }
+                  } else if (m.name === 'Mat_Marker_Glow') {
+                    // 车顶与货厢侧面琥珀黄安全示宽小灯
+                    const amberLed = new THREE.MeshBasicMaterial({
+                      color: 0xfbbf24,
+                      polygonOffset: true,
+                      polygonOffsetFactor: -3,
+                      polygonOffsetUnits: -3,
+                      toneMapped: false
+                    });
+                    if (Array.isArray(meshObj.material)) {
+                      (meshObj.material as THREE.Material[])[idx] = amberLed;
+                    } else {
+                      meshObj.material = amberLed;
                     }
                   } else if (m.name === 'Mat_Seat_Fabric') {
                     if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
