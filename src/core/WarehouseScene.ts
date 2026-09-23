@@ -660,6 +660,13 @@ export class WarehouseScene {
     this.triggerPopupUpdate();
   }
 
+  public focusHoloScreen() {
+    this.camera.position.set(3.4, 2.05, -3.2);
+    this.controls.target.set(4.48, 1.80, -7.12);
+    this.controls.update();
+    this.triggerPopupUpdate();
+  }
+
   public toggleAnimation(): boolean {
     this.isAnimationPaused = !this.isAnimationPaused;
     return this.isAnimationPaused;

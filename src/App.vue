@@ -174,8 +174,20 @@ onMounted(async () => {
 
     loadingRef.value?.complete();
 
-    if (typeof window !== 'undefined' && window.location.search.includes('view=top')) {
-      sceneInstance.setTopView();
+    if (typeof window !== 'undefined') {
+      if (window.location.search.includes('theme=studio')) {
+        sceneInstance.setTheme('studio');
+        currentTheme.value = 'studio';
+      }
+      if (window.location.search.includes('view=top')) {
+        sceneInstance.setTopView();
+      }
+      if (window.location.search.includes('view=screen')) {
+        sceneInstance.focusHoloScreen();
+      }
+      if (window.location.search.includes('preview=popup')) {
+        (window as any).__showEntityPopup?.('pc_workstation');
+      }
     }
   } catch (err: any) {
     console.error('模型加载失败:', err);
