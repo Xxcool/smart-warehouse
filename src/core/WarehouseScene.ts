@@ -67,10 +67,10 @@ export class WarehouseScene {
     this.scene.background = new THREE.Color(0x080d17);
     this.scene.fog = new THREE.Fog(0x080d17, 50, 160);
 
-    // 2. 相机 (34° FOV 保证整仓完整居中铺满)
+    // 2. 相机 (34° FOV 保证整仓完整居中铺满，优化近远裁剪面杜绝大场景深度缓冲精度不足)
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(34, w / h, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(34, w / h, 0.5, 500);
     this.camera.position.copy(this.defaultCamPos);
 
     // 3. 渲染器
@@ -330,6 +330,7 @@ export class WarehouseScene {
                 this.roadStripesMesh = child as THREE.Mesh;
                 child.castShadow = false;
                 child.receiveShadow = false;
+                child.renderOrder = 5;
               } else if (n === 'Holo_Screen_Panel') {
                 // 4. 室内悬浮全息微晶看板
                 child.castShadow = false;
@@ -507,9 +508,10 @@ export class WarehouseScene {
       }
       if (this.roadStripesMesh) {
         this.roadStripesMesh.material = new THREE.MeshBasicMaterial({
-          color: 0x00f0ff,
-          transparent: true,
-          opacity: 0.85
+          color: 0x00f3ff,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2
         });
       }
     } else {
@@ -548,7 +550,10 @@ export class WarehouseScene {
       }
       if (this.roadStripesMesh) {
         this.roadStripesMesh.material = new THREE.MeshBasicMaterial({
-          color: 0xffffff
+          color: 0xffffff,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2
         });
       }
     }
