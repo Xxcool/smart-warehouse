@@ -401,7 +401,7 @@ export class WarehouseScene {
   public loadModel(onProgress?: (percent: number, items: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       const gltfLoader = new GLTFLoader();
-      const modelUrl = '/smart_warehouse.glb?v=2.2.1';
+      const modelUrl = '/smart_warehouse.glb?v=2.2.2';
 
       gltfLoader.load(
         modelUrl,
@@ -499,33 +499,17 @@ export class WarehouseScene {
                 child.receiveShadow = false;
                 child.renderOrder = 5;
               } else if (n === 'Holo_Screen_Panel') {
-                // 4. 室内发光全息管控看板 (投射高科技动态态势 UI)
-                this.holoScreenPanelMesh = child as THREE.Mesh;
-                child.castShadow = false;
-                child.receiveShadow = false;
-                if (!this.holoScreenTexture) {
-                  this.holoScreenTexture = this.createHoloScreenTexture();
-                }
-                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                  map: this.holoScreenTexture,
-                  emissive: 0xffffff,
-                  emissiveMap: this.holoScreenTexture,
-                  emissiveIntensity: 0.65,
-                  roughness: 0.20,
-                  metalness: 0.10,
-                  side: THREE.DoubleSide
-                });
+                // 隐藏原 GLB 内部被完全包裹遮挡的旧模型面板
+                child.visible = false;
               } else if (n === 'Holo_Screen_Border') {
-                // 4.1 全息大屏钛合金外框与微光包边
+                // 4.1 全息大屏钛合金外框底壳与后背板
                 this.holoScreenBorderMesh = child as THREE.Mesh;
                 child.castShadow = true;
                 child.receiveShadow = true;
                 (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                  color: 0x1f3452,
-                  roughness: 0.25,
-                  metalness: 0.80,
-                  emissive: 0x004466,
-                  emissiveIntensity: 0.35
+                  color: 0x162232,
+                  roughness: 0.28,
+                  metalness: 0.75
                 });
               } else if (n.startsWith('Holo_Stand_')) {
                 // 4.2 全息大屏金属落地支撑脚架
@@ -533,8 +517,8 @@ export class WarehouseScene {
                 child.castShadow = true;
                 child.receiveShadow = true;
                 (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                  color: 0x475569,
-                  roughness: 0.30,
+                  color: 0x5a6d85,
+                  roughness: 0.25,
                   metalness: 0.85
                 });
               } else {
@@ -611,6 +595,21 @@ export class WarehouseScene {
             this.movingRoadTruck.userData.entityKey = 'outbound_truck';
             this.interactiveMeshes.push(this.movingRoadTruck);
           }
+
+          // 4.3 构建居于大屏边框前表面的超清自发光全息管控大屏 (不受内部死黑模型包裹)
+          if (!this.holoScreenTexture) {
+            this.holoScreenTexture = this.createHoloScreenTexture();
+          }
+          const screenGeo = new THREE.PlaneGeometry(4.25, 2.42);
+          const screenMat = new THREE.MeshBasicMaterial({
+            map: this.holoScreenTexture,
+            side: THREE.DoubleSide
+          });
+          this.holoScreenPanelMesh = new THREE.Mesh(screenGeo, screenMat);
+          this.holoScreenPanelMesh.position.set(4.48, 1.80, -7.12);
+          this.holoScreenPanelMesh.rotation.y = -0.2366;
+          this.holoScreenPanelMesh.renderOrder = 3;
+          this.scene.add(this.holoScreenPanelMesh);
 
           if (this.currentTheme === 'cyber') {
             this.setTheme('cyber');
@@ -695,8 +694,8 @@ export class WarehouseScene {
 
       if (this.warehouseFloorMesh && (this.warehouseFloorMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.warehouseFloorMesh.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(0x192842); // 具有通透科技感的深青蓝高反光地坪 (彻底告别死黑，阶梯立体对比)
-        mat.roughness = 0.22;
+        mat.color.setHex(0x20324d); // 明晰通透的高级深青蓝地坪 (质感通透，高反光，绝不发黑)
+        mat.roughness = 0.20;
         mat.metalness = 0.35;
       }
       this.glassWallMeshes.forEach((mesh) => {
@@ -729,18 +728,15 @@ export class WarehouseScene {
         }
       });
 
-      if (this.holoScreenPanelMesh && (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial)) {
-        (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.65;
-      }
       if (this.holoScreenBorderMesh && (this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(0x1f3452);
-        mat.emissive.setHex(0x004466);
-        mat.emissiveIntensity = 0.35;
+        mat.color.setHex(0x1a2638);
+        mat.roughness = 0.28;
+        mat.metalness = 0.75;
       }
       this.holoStandMeshes.forEach((mesh) => {
         if (mesh.material && (mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-          (mesh.material as THREE.MeshStandardMaterial).color.setHex(0x475569);
+          (mesh.material as THREE.MeshStandardMaterial).color.setHex(0x5a6d85);
         }
       });
 
@@ -822,9 +818,6 @@ export class WarehouseScene {
         }
       });
 
-      if (this.holoScreenPanelMesh && (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial)) {
-        (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.20;
-      }
       if (this.holoScreenBorderMesh && (this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial;
         mat.color.setHex(0x475569);
