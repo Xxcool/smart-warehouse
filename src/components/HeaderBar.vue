@@ -9,14 +9,14 @@
         <span class="live-tag">LIVE 实时孪生</span>
       </div>
       <div class="brand-info">
-        <div class="brand-hub">自动化仓储运营中心</div>
-        <div class="brand-code">NODE #WH-A01 · 60 FPS 动态孪生</div>
+        <div class="brand-hub">自动化仓储管控中心</div>
+        <div class="brand-code">NODE #WH-A01 · 60 FPS 全域数字孪生</div>
       </div>
     </div>
 
     <!-- 中间：平台主标题与科技装饰轨 -->
     <div class="header-center-group">
-      <div class="main-title">智慧仓储数字孪生平台</div>
+      <div class="main-title">智慧仓储数字孪生管控平台</div>
       <div class="sub-title-track">
         <span class="track-deco-left"></span>
         <span class="sub-title">SMART WAREHOUSE DIGITAL TWIN PLATFORM</span>
@@ -26,7 +26,7 @@
 
     <!-- 右侧：天气气象、实时时钟与全屏 -->
     <div class="header-right-group">
-      <!-- 实时气象感知 (精简大屏风格) -->
+      <!-- 实时气象感知 -->
       <div class="weather-card">
         <div class="weather-main">
           <span class="weather-icon">⛅</span>
@@ -43,6 +43,16 @@
         <div class="clock-date">{{ currentDate }}</div>
       </div>
 
+      <!-- 孪生场景主题切换 (赛博深空 / 白昼沙盘) -->
+      <button
+        class="theme-toggle-btn"
+        @click="$emit('toggle-theme')"
+        :title="theme === 'cyber' ? '当前：赛博深空全息模式，点击切换为白昼展厅模式' : '当前：白昼展厅沙盘模式，点击切换为赛博深空模式'"
+      >
+        <span class="theme-btn-icon">{{ theme === 'cyber' ? '🌙' : '☀️' }}</span>
+        <span class="theme-btn-text">{{ theme === 'cyber' ? '赛博深空' : '白昼展厅' }}</span>
+      </button>
+
       <!-- 全屏沉浸按钮 -->
       <button class="fullscreen-btn" @click="toggleFullscreen" title="切换全屏沉浸大屏">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -55,6 +65,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+
+defineProps<{
+  theme?: 'cyber' | 'studio';
+}>();
+
+defineEmits<{
+  (e: 'toggle-theme'): void;
+}>();
 
 const currentTime = ref('');
 const currentDate = ref('');
@@ -99,49 +117,61 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 68px;
+  height: 52px;
   z-index: 25;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 28px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 85%, rgba(255, 255, 255, 0.4) 100%);
-  border-bottom: 1px solid rgba(203, 213, 225, 0.7);
+  padding: 0 24px;
+  background: linear-gradient(180deg, rgba(9, 14, 24, 0.94) 0%, rgba(11, 18, 30, 0.82) 100%);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.22);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   pointer-events: auto;
+  user-select: none;
+}
+
+/* 顶部全息发光导光线 */
+.digital-twin-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 240, 255, 0.6) 50%, transparent 100%);
 }
 
 .header-left-group {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-width: 280px;
+  gap: 12px;
+  min-width: 270px;
 }
 .brand-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  gap: 7px;
+  padding: 4px 9px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
   border-radius: 20px;
 }
 .status-pulse-ring {
   position: relative;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .status-dot {
-  width: 8px;
-  height: 8px;
-  background: #16a34a;
+  width: 6px;
+  height: 6px;
+  background: #10b981;
   border-radius: 50%;
-  box-shadow: 0 0 8px #22c55e;
+  box-shadow: 0 0 6px #10b981;
   animation: pulseDot 2s infinite ease-in-out;
 }
 @keyframes pulseDot {
@@ -149,9 +179,9 @@ onUnmounted(() => {
   50% { transform: scale(1.3); opacity: 0.6; }
 }
 .live-tag {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  color: #15803d;
+  color: #34d399;
   letter-spacing: 0.5px;
 }
 .brand-info {
@@ -159,12 +189,12 @@ onUnmounted(() => {
   flex-direction: column;
 }
 .brand-hub {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  color: #1e293b;
+  color: #f1f5f9;
 }
 .brand-code {
-  font-size: 11px;
+  font-size: 10px;
   color: #64748b;
   font-family: ui-monospace, monospace;
 }
@@ -179,40 +209,40 @@ onUnmounted(() => {
   transform: translateX(-50%);
 }
 .main-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: 1.2px;
-  color: #0f172a;
-  background: linear-gradient(90deg, #0f172a 0%, #1e40af 50%, #0f172a 100%);
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  background: linear-gradient(90deg, #ffffff 0%, #38bdf8 50%, #ffffff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 2px 10px rgba(37, 99, 235, 0.1);
+  text-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
 }
 .sub-title-track {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 3px;
+  gap: 8px;
+  margin-top: 2px;
 }
 .sub-title {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  color: #3b82f6;
-  letter-spacing: 2px;
+  color: #38bdf8;
+  letter-spacing: 1.8px;
 }
 .track-deco-left, .track-deco-right {
-  width: 32px;
+  width: 28px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #3b82f6);
+  background: linear-gradient(90deg, transparent, #00f0ff);
 }
 .track-deco-right {
-  background: linear-gradient(90deg, #3b82f6, transparent);
+  background: linear-gradient(90deg, #00f0ff, transparent);
 }
 
 .header-right-group {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   justify-content: flex-end;
 }
 .weather-card {
@@ -222,38 +252,36 @@ onUnmounted(() => {
 .weather-main {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1e293b;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
 }
 .weather-icon {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
 }
 .weather-temp {
-  color: #0284c7;
-  font-size: 16px;
+  color: #38bdf8;
+  font-size: 15px;
   font-weight: 700;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-  letter-spacing: -0.2px;
+  font-family: ui-monospace, monospace;
   display: inline-flex;
   align-items: baseline;
 }
 .weather-temp .temp-unit {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   margin-left: 2px;
 }
 .weather-cond {
-  color: #475569;
-  font-size: 13px;
-  font-weight: 600;
+  color: #94a3b8;
+  font-size: 11px;
 }
 .header-v-divider {
   width: 1px;
-  height: 28px;
-  background: #cbd5e1;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.12);
 }
 .clock-card {
   display: flex;
@@ -261,23 +289,49 @@ onUnmounted(() => {
   align-items: flex-end;
 }
 .clock-time {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
-  color: #0f172a;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #00f0ff;
+  font-family: ui-monospace, monospace;
   letter-spacing: 0.8px;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
 }
 .clock-date {
-  font-size: 11px;
+  font-size: 10px;
   color: #64748b;
 }
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(0, 240, 255, 0.10);
+  border: 1px solid rgba(0, 240, 255, 0.30);
+  color: #00f0ff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.theme-toggle-btn:hover {
+  background: rgba(0, 240, 255, 0.20);
+  border-color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+  transform: translateY(-1px);
+}
+.theme-btn-icon {
+  font-size: 12px;
+}
 .fullscreen-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  color: #475569;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -285,9 +339,9 @@ onUnmounted(() => {
   transition: all 0.2s;
 }
 .fullscreen-btn:hover {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  background: rgba(0, 240, 255, 0.18);
+  color: #00f0ff;
+  border-color: rgba(0, 240, 255, 0.5);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
 }
 </style>

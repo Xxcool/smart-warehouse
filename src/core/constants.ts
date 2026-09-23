@@ -2,15 +2,15 @@ import { EntityDetail, EntityKey } from '../types/warehouse';
 
 export const ENTITY_DATA: Record<EntityKey, EntityDetail> = {
   pc_workstation: {
-    title: "分拣工位一体机终端",
-    sub: "人机协同高频质检扫码站",
-    tag: "高效分拣",
+    title: "六轴工业机械臂分拣工作台",
+    sub: "自动化矩阵式高速拣选与立体码垛岛",
+    tag: "AI视觉分拣中",
     rows: [
-      { l: "终端编号", v: "IPC-Station-A03", blue: true },
-      { l: "当前作业员", v: "李明 (工号: OP-3082)" },
-      { l: "当前任务进度", v: "86% (43/50行)", progress: 86 },
-      { l: "扫码拣选速率", v: "480 件/小时", green: true },
-      { l: "配件状态", v: "无线扫码枪与条码打印机通信正常" }
+      { l: "工作站编号", v: "ROBOT-SORT-WS03", blue: true },
+      { l: "机械臂型号", v: "KUKA-KR6 工业六轴重载关节臂" },
+      { l: "当前抓取负载", v: "84% (额定 6.0 kg)", progress: 84 },
+      { l: "分拣吞吐速率", v: "1,260 件/小时 (高精度对齐)", green: true },
+      { l: "视觉定位精度", v: "±0.15 mm (3D 结构光导引)" }
     ]
   },
   conveyor_dock1: {

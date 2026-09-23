@@ -51,6 +51,8 @@ const props = defineProps<{
   screenX: number;
   screenY: number;
   behindCamera: boolean;
+  safeLeft?: number;
+  safeRight?: number;
 }>();
 
 defineEmits<{
@@ -59,10 +61,10 @@ defineEmits<{
 
 const popupEl = ref<HTMLElement | null>(null);
 
-const cardW = 320;
+const cardW = 310;
 
 const placementClass = computed(() => {
-  const safeTop = (props.screenX > 320 && props.screenX < window.innerWidth - 320) ? 115 : 75;
+  const safeTop = 64;
   if (props.screenY < safeTop + 45) {
     return 'placement-bottom';
   }
@@ -72,11 +74,11 @@ const placementClass = computed(() => {
 const isBottom = computed(() => placementClass.value === 'placement-bottom');
 
 const clampedPosition = computed(() => {
-  const cardH = popupEl.value?.offsetHeight || 210;
-  const safeTop = (props.screenX > 320 && props.screenX < window.innerWidth - 320) ? 115 : 75;
+  const cardH = popupEl.value?.offsetHeight || 200;
+  const safeTop = 64;
   const safeBottom = window.innerHeight - 24;
-  const safeLeft = 20;
-  const safeRight = window.innerWidth - 20;
+  const safeLeft = props.safeLeft ?? 20;
+  const safeRight = props.safeRight ?? (window.innerWidth - 20);
 
   const halfW = cardW / 2;
   const minX = safeLeft + halfW;
@@ -125,9 +127,10 @@ const caretStyle = computed(() => {
   position: absolute;
   z-index: 35;
   pointer-events: auto;
-  filter: drop-shadow(0 14px 30px rgba(15, 23, 42, 0.20));
+  filter: drop-shadow(0 14px 35px rgba(0, 0, 0, 0.6));
   transition: opacity 0.18s ease;
-  font-size: 13px;
+  font-size: 12px;
+  user-select: none;
 }
 
 .anchored-popup.placement-top {
@@ -138,10 +141,11 @@ const caretStyle = computed(() => {
   bottom: -6px;
   top: auto;
   transform: translateX(-50%) rotate(45deg);
-  border-right: 1px solid #cbd5e1;
-  border-bottom: 1px solid #cbd5e1;
+  border-right: 1px solid rgba(0, 240, 255, 0.4);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.4);
   border-left: none;
   border-top: none;
+  background: rgba(11, 18, 30, 0.96);
 }
 
 .anchored-popup.placement-bottom {
@@ -152,20 +156,21 @@ const caretStyle = computed(() => {
   top: -6px;
   bottom: auto;
   transform: translateX(-50%) rotate(225deg);
-  border-right: 1px solid #cbd5e1;
-  border-bottom: 1px solid #cbd5e1;
+  border-right: 1px solid rgba(0, 240, 255, 0.4);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.4);
   border-left: none;
   border-top: none;
+  background: rgba(11, 18, 30, 0.96);
 }
 
 .popup-card {
-  width: 320px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid #cbd5e1;
+  width: 310px;
+  background: linear-gradient(135deg, rgba(11, 18, 30, 0.94) 0%, rgba(15, 23, 42, 0.90) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.35);
   border-radius: 12px;
-  padding: 16px 18px;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.10);
-  max-height: calc(100vh - 160px);
+  padding: 14px 16px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65), inset 0 0 16px rgba(0, 240, 255, 0.06);
+  max-height: calc(100vh - 140px);
   overflow-y: auto;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -175,7 +180,6 @@ const caretStyle = computed(() => {
   left: 50%;
   width: 12px;
   height: 12px;
-  background: #ffffff;
   pointer-events: none;
   transition: transform 0.1s ease;
 }
@@ -183,9 +187,9 @@ const caretStyle = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  border-bottom: 1px solid #f1f5f9;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
   gap: 12px;
 }
 .header-action-group {
@@ -194,26 +198,27 @@ const caretStyle = computed(() => {
   gap: 8px;
 }
 .popup-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: #ffffff;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .popup-sub {
-  font-size: 11px;
-  color: #64748b;
+  font-size: 10px;
+  color: #94a3b8;
   margin-top: 2px;
+  font-family: ui-monospace, monospace;
 }
 .popup-tag {
-  font-size: 11px;
-  font-weight: 600;
-  color: #2563eb;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  padding: 2px 8px;
-  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  padding: 2px 7px;
+  border-radius: 10px;
   white-space: nowrap;
 }
 .popup-close {
@@ -221,40 +226,41 @@ const caretStyle = computed(() => {
   color: #94a3b8;
   font-size: 18px;
   line-height: 1;
-  padding: 2px 4px;
+  padding: 2px 5px;
   border-radius: 4px;
   transition: all 0.15s;
 }
 .popup-close:hover {
-  color: #0f172a;
-  background: #f1f5f9;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
 }
 .data-block {
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 .data-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: 11px;
 }
-.data-label { color: #64748b; }
-.data-val { font-weight: 600; color: #1e293b; font-family: ui-monospace, monospace; }
-.data-val.blue { color: #2563eb; }
-.data-val.green { color: #10b981; }
+.data-label { color: #94a3b8; }
+.data-val { font-weight: 600; color: #f1f5f9; font-family: ui-monospace, monospace; }
+.data-val.blue { color: #38bdf8; }
+.data-val.green { color: #34d399; }
 .progress-wrap {
   width: 100%;
-  height: 5px;
-  background: #e2e8f0;
-  border-radius: 3px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
   overflow: hidden;
   margin-top: 4px;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  border-radius: 3px;
+  background: linear-gradient(90deg, #0284c7, #00f0ff);
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
   transition: width 0.3s;
 }
 </style>

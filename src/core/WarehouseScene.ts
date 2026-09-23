@@ -7,6 +7,13 @@ export interface PickCallback {
   (entityKey: EntityKey, anchorWorldPos: [number, number, number], isMoving: boolean): void;
 }
 
+export interface AgvItem {
+  node: THREE.Object3D;
+  offset: number;
+  cargoMesh: THREE.Mesh;
+  hasCargo: boolean;
+}
+
 export class WarehouseScene {
   private container: HTMLElement;
   private scene: THREE.Scene;
@@ -18,10 +25,22 @@ export class WarehouseScene {
   private defaultTarget = new THREE.Vector3(2.0, 0.5, -2.5);
 
   private interactiveMeshes: THREE.Object3D[] = [];
-  private agvRobots: { node: THREE.Object3D; offset: number }[] = [];
+  private agvRobots: AgvItem[] = [];
+  private agvKraftMat = new THREE.MeshStandardMaterial({ color: 0xb58958, roughness: 0.75 });
+  private agvWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.35 });
+  private robotArmNodes: { turntable: THREE.Object3D; wrist: THREE.Object3D; phase: number }[] = [];
+  private cyberParticles: THREE.Points | null = null;
   private conveyorCargoList: { mesh: THREE.Mesh; offset: number }[] = [];
   private warehouseModel: THREE.Group | null = null;
   private movingRoadTruck: THREE.Object3D | null = null;
+  private exteriorGroundMesh: THREE.Mesh | null = null;
+  private truckRoadMesh: THREE.Mesh | null = null;
+  private roadStripesMesh: THREE.Mesh | null = null;
+  private ambientLight: THREE.AmbientLight | null = null;
+  private hemiLight: THREE.HemisphereLight | null = null;
+  private sunLight: THREE.DirectionalLight | null = null;
+  private fillLight: THREE.DirectionalLight | null = null;
+  public currentTheme: 'studio' | 'cyber' = 'cyber';
   private agvCurve: THREE.CatmullRomCurve3;
 
   private currentTrackedObject: THREE.Object3D | null = null;
@@ -45,8 +64,8 @@ export class WarehouseScene {
 
     // 1. 场景
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xe7eef6);
-    this.scene.fog = new THREE.Fog(0xe7eef6, 80, 200);
+    this.scene.background = new THREE.Color(0x080d17);
+    this.scene.fog = new THREE.Fog(0x080d17, 50, 160);
 
     // 2. 相机 (34° FOV 保证整仓完整居中铺满)
     const w = this.container.clientWidth || window.innerWidth;
@@ -77,12 +96,16 @@ export class WarehouseScene {
 
     // 5. 初始化光照
     this.initLights();
+    this.setTheme(this.currentTheme);
 
     // 6. 初始化 AGV 巡线导引样条 (避开南区货架托盘，Z=4.95)
     this.agvCurve = this.initAgvRoute();
 
     // 7. 初始化传送带动态纸箱
     this.initConveyorCargo();
+
+    // 7.1 初始化悬浮赛博微光粒子
+    this.initCyberParticles();
 
     // 8. 绑定事件
     this.bindEvents();
@@ -93,48 +116,85 @@ export class WarehouseScene {
   }
 
   private initLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.88);
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.90);
+    this.scene.add(this.ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xdbe4ee, 0.65);
-    this.scene.add(hemiLight);
+    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0xdbe4ee, 0.65);
+    this.scene.add(this.hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.25);
-    sunLight.position.set(30, 42, 26);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.bias = -0.00015;
-    sunLight.shadow.camera.left = -32;
-    sunLight.shadow.camera.right = 32;
-    sunLight.shadow.camera.top = 32;
-    sunLight.shadow.camera.bottom = -32;
-    this.scene.add(sunLight);
+    this.sunLight = new THREE.DirectionalLight(0xffffff, 1.35);
+    this.sunLight.position.set(32, 44, 28);
+    this.sunLight.castShadow = true;
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
+    this.sunLight.shadow.bias = -0.00012;
+    this.sunLight.shadow.camera.left = -32;
+    this.sunLight.shadow.camera.right = 32;
+    this.sunLight.shadow.camera.top = 32;
+    this.sunLight.shadow.camera.bottom = -32;
+    this.scene.add(this.sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0xe7eef6, 0.45);
-    fillLight.position.set(-25, 25, -25);
-    this.scene.add(fillLight);
+    this.fillLight = new THREE.DirectionalLight(0xd9e8f8, 0.45);
+    this.fillLight.position.set(-25, 25, -25);
+    this.scene.add(this.fillLight);
+
+    // 室内柔和科技冷光，照亮深色高反光地坪与机械臂
+    const cyberInteriorLight = new THREE.PointLight(0x00e5ff, 1.6, 40, 1.2);
+    cyberInteriorLight.position.set(0, 5.2, 0);
+    this.scene.add(cyberInteriorLight);
+  }
+
+  private initCyberParticles() {
+    const particleCount = 120;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 32;
+      positions[i * 3 + 1] = 0.5 + Math.random() * 5.2;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 22;
+    }
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.PointsMaterial({
+      color: 0x00f0ff,
+      size: 0.16,
+      transparent: true,
+      opacity: 0.70,
+      blending: THREE.AdditiveBlending
+    });
+    this.cyberParticles = new THREE.Points(geometry, material);
+    this.scene.add(this.cyberParticles);
   }
 
   private initAgvRoute(): THREE.CatmullRomCurve3 {
     const agvPathPoints = [
-      new THREE.Vector3(-8.8, 0.08, -5.5),
-      new THREE.Vector3(-7.2, 0.08, -5.5),
-      new THREE.Vector3(-6.5, 0.08, -4.5),
-      new THREE.Vector3(-6.5, 0.08, 4.2),
-      new THREE.Vector3(-5.8, 0.08, 4.95),
-      new THREE.Vector3(5.0, 0.08, 4.95),  // 南侧走廊中线，保持 0.61m 安全避让托盘
-      new THREE.Vector3(5.8, 0.08, 4.2),
-      new THREE.Vector3(5.8, 0.08, -4.8),
-      new THREE.Vector3(5.0, 0.08, -5.6),
-      new THREE.Vector3(-5.5, 0.08, -5.6),
-      new THREE.Vector3(-7.2, 0.08, -5.6),
-      new THREE.Vector3(-8.8, 0.08, -5.5)
+      // 1. 1号装卸月台自动化滚筒驳运交接工位 (货箱精准对接处)
+      new THREE.Vector3(-9.2, 0.12, -5.5),
+      new THREE.Vector3(-7.2, 0.12, -5.5),
+      new THREE.Vector3(-6.8, 0.12, -5.0),
+      // 2. 西侧主干巡线车道 (平直向南，直达南侧通道)
+      new THREE.Vector3(-6.8, 0.12, -4.6),
+      new THREE.Vector3(-6.8, 0.12, 0.0),
+      new THREE.Vector3(-6.8, 0.12, 4.6),
+      // 3. 南侧中央走廊宽阔车道 (笔直横跨主通道)
+      new THREE.Vector3(-4.0, 0.12, 4.6),
+      new THREE.Vector3(0.0, 0.12, 4.6),
+      new THREE.Vector3(4.0, 0.12, 4.6),
+      new THREE.Vector3(6.8, 0.12, 4.6),
+      // 4. 东侧出入库车道 (经过2/3号月台前侧，笔直向北)
+      new THREE.Vector3(6.8, 0.12, 0.0),
+      new THREE.Vector3(6.8, 0.12, -4.6),
+      // 5. 北侧分拣主干道 (向西巡航)
+      new THREE.Vector3(4.0, 0.12, -4.6),
+      new THREE.Vector3(0.0, 0.12, -4.6),
+      new THREE.Vector3(-4.0, 0.12, -4.6),
+      new THREE.Vector3(-6.8, 0.12, -4.6),
+      new THREE.Vector3(-9.2, 0.12, -4.8),
+      new THREE.Vector3(-9.2, 0.12, -5.5)
     ];
     const curve = new THREE.CatmullRomCurve3(agvPathPoints, true, 'centripetal', 0.05);
 
-    // 导引虚线
-    const routeGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(260));
+    // 导引虚线 (与地面发光导轨 100% 重合微浮)
+    const routeGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(280));
     const routeMat = new THREE.LineDashedMaterial({
       color: 0x00f0ff,
       dashSize: 0.6,
@@ -150,11 +210,11 @@ export class WarehouseScene {
     const arrowGeo = new THREE.ConeGeometry(0.18, 0.4, 4);
     arrowGeo.rotateX(Math.PI / 2);
     const arrowMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-    for (let t = 0; t < 1.0; t += 0.06) {
+    for (let t = 0; t < 1.0; t += 0.05) {
       const p = curve.getPointAt(t);
       const tg = curve.getTangentAt(t);
       const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-      arrow.position.set(p.x, 0.09, p.z);
+      arrow.position.set(p.x, 0.13, p.z);
       arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tg);
       navArrowsGroup.add(arrow);
     }
@@ -165,17 +225,17 @@ export class WarehouseScene {
 
   private initConveyorCargo() {
     const cBoxGeo = new THREE.BoxGeometry(0.55, 0.38, 0.55);
-    const cBoxMatBlue = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.35 });
-    const cBoxMatWhite = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 });
-    for (let i = 0; i < 6; i++) {
-      const bMat = i % 2 === 0 ? cBoxMatBlue : cBoxMatWhite;
+    const cBoxMatKraft = new THREE.MeshStandardMaterial({ color: 0xb58958, roughness: 0.75 });
+    const cBoxMatWhite = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.35 });
+    for (let i = 0; i < 4; i++) {
+      const bMat = i % 2 === 0 ? cBoxMatKraft : cBoxMatWhite;
       const cBox = new THREE.Mesh(cBoxGeo, bMat);
       cBox.castShadow = true;
       cBox.receiveShadow = true;
       cBox.userData = { entityKey: 'conveyor_dock1' as EntityKey };
       this.scene.add(cBox);
       this.interactiveMeshes.push(cBox);
-      this.conveyorCargoList.push({ mesh: cBox, offset: i / 6.0 });
+      this.conveyorCargoList.push({ mesh: cBox, offset: i / 4.0 });
     }
   }
 
@@ -197,13 +257,97 @@ export class WarehouseScene {
             }
 
             if ((child as THREE.Mesh).isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-
               const n = child.name;
+
+              // 1. 浅蓝通透高保真钢化玻璃幕墙与双面透光
+              if (n.startsWith('Glass_')) {
+                child.castShadow = false;
+                child.receiveShadow = false;
+                (child as THREE.Mesh).material = new THREE.MeshPhysicalMaterial({
+                  color: 0x88c2f5,
+                  transparent: true,
+                  opacity: 0.32,
+                  roughness: 0.05,
+                  metalness: 0.06,
+                  transmission: 0.90,
+                  ior: 1.50,
+                  reflectivity: 0.65,
+                  clearcoat: 0.85,
+                  clearcoatRoughness: 0.06,
+                  depthWrite: false,
+                  side: THREE.DoubleSide
+                });
+              } else if (n.startsWith('AGV_Trajectory_Laser_Line')) {
+                // 2. AGV 轨迹中心高亮发光线
+                child.castShadow = false;
+                child.receiveShadow = false;
+                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
+                  color: 0x00f3ff
+                });
+              } else if (n.startsWith('AGV_Track_Base_Band')) {
+                // 2.1 AGV 轨迹导轨路面基带
+                child.castShadow = false;
+                child.receiveShadow = true;
+                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+                  color: 0x142234,
+                  roughness: 0.35,
+                  metalness: 0.25
+                });
+              } else if (n.startsWith('AGV_Waypoint_')) {
+                // 2.2 AGV 导航地标与工位圆环
+                child.castShadow = false;
+                child.receiveShadow = false;
+                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
+                  color: 0x00f3ff,
+                  side: THREE.DoubleSide
+                });
+              } else if (n.startsWith('Cargo_Line_')) {
+                // 2.3 货物存储区/托盘定置区工业安全黄色标线 (与 AGV 行驶轨迹清晰区分)
+                child.castShadow = false;
+                child.receiveShadow = false;
+                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
+                  color: 0xf59e0b
+                });
+              } else if (n === 'Warehouse_Floor') {
+                // 3. 高反光深灰蓝镜面地坪 (与 cover.jpg 质感对齐)
+                child.castShadow = false;
+                child.receiveShadow = true;
+                const fMat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+                if (fMat) {
+                  fMat.color.setHex(0x131924);
+                  fMat.roughness = 0.20;
+                  fMat.metalness = 0.28;
+                }
+              } else if (n === 'Exterior_Ground') {
+                this.exteriorGroundMesh = child as THREE.Mesh;
+                child.castShadow = false;
+                child.receiveShadow = true;
+              } else if (n === 'Truck_Road_East') {
+                this.truckRoadMesh = child as THREE.Mesh;
+                child.castShadow = false;
+                child.receiveShadow = true;
+              } else if (n === 'Road_Stripes_Unified') {
+                this.roadStripesMesh = child as THREE.Mesh;
+                child.castShadow = false;
+                child.receiveShadow = false;
+              } else if (n === 'Holo_Screen_Panel') {
+                // 4. 室内悬浮全息微晶看板
+                child.castShadow = false;
+                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
+                  color: 0x00f3ff,
+                  transparent: true,
+                  opacity: 0.55,
+                  side: THREE.DoubleSide,
+                  depthWrite: false
+                });
+              } else {
+                child.castShadow = true;
+                child.receiveShadow = true;
+              }
+
               let matchedKey: EntityKey | null = null;
 
-              if (n.includes('Workstation') || n.startsWith('WS_')) {
+              if (n.includes('Workstation') || n.startsWith('WS_') || n.includes('Robot_')) {
                 matchedKey = 'pc_workstation';
               } else if (n.includes('Conveyor') || n.includes('Sort_Table')) {
                 matchedKey = 'conveyor_dock1';
@@ -230,14 +374,36 @@ export class WarehouseScene {
             }
           });
 
-          // 提取 7 台 AGV 机器人
+          // 提取 6 台六轴工业机械臂关节，用于平滑拣选点动动画
+          for (let i = 1; i <= 6; i++) {
+            const prefix = `Workstation_Robot_${i < 10 ? '0' + i : i}`;
+            const tt = this.warehouseModel.getObjectByName(`${prefix}_Turntable`);
+            const wrist = this.warehouseModel.getObjectByName(`${prefix}_Wrist`);
+            if (tt && wrist) {
+              this.robotArmNodes.push({ turntable: tt, wrist: wrist, phase: i * 1.15 });
+            }
+          }
+
+          // 提取 7 台 AGV 机器人并挂载动态接驳货箱 (支持牛皮纸箱与白膜包装箱动态移载)
+          const agvBoxGeo = new THREE.BoxGeometry(0.52, 0.32, 0.42);
           for (let i = 1; i <= 7; i++) {
             const agvName = `AGV_Robot_${i < 10 ? '0' + i : i}`;
             const node = this.warehouseModel.getObjectByName(agvName);
             if (node) {
+              const cargoMesh = new THREE.Mesh(agvBoxGeo, i % 2 === 1 ? this.agvKraftMat : this.agvWhiteMat);
+              cargoMesh.position.set(0, 0.30, 0); // 端正贴合在 AGV 承载平台上表面
+              cargoMesh.castShadow = true;
+              cargoMesh.receiveShadow = true;
+              cargoMesh.userData.entityKey = 'agv_robot';
+              cargoMesh.visible = false; // 由动画状态机依据当前所处工位动态控制显隐
+              node.add(cargoMesh);
+              this.interactiveMeshes.push(cargoMesh);
+
               this.agvRobots.push({
                 node: node,
-                offset: (i - 1) / 7.0
+                offset: (i - 1) / 7.0,
+                cargoMesh: cargoMesh,
+                hasCargo: false
               });
             }
           }
@@ -247,6 +413,10 @@ export class WarehouseScene {
           if (this.movingRoadTruck) {
             this.movingRoadTruck.userData.entityKey = 'outbound_truck';
             this.interactiveMeshes.push(this.movingRoadTruck);
+          }
+
+          if (this.currentTheme === 'cyber') {
+            this.setTheme('cyber');
           }
 
           if (onProgress) onProgress(100, 109);
@@ -297,6 +467,97 @@ export class WarehouseScene {
   public toggleAnimation(): boolean {
     this.isAnimationPaused = !this.isAnimationPaused;
     return this.isAnimationPaused;
+  }
+
+  public setTheme(theme: 'studio' | 'cyber') {
+    this.currentTheme = theme;
+    if (theme === 'cyber') {
+      // 赛博深空全息模式：与深色微晶 HUD 100% 融合，如同深夜高科技保税仓
+      this.scene.background = new THREE.Color(0x080d17);
+      this.scene.fog = new THREE.Fog(0x080d17, 50, 160);
+
+      if (this.ambientLight) {
+        this.ambientLight.intensity = 0.50;
+        this.ambientLight.color.setHex(0x507090);
+      }
+      if (this.hemiLight) {
+        this.hemiLight.intensity = 0.35;
+        this.hemiLight.color.setHex(0x38bdf8);
+      }
+      if (this.sunLight) {
+        this.sunLight.intensity = 1.15;
+        this.sunLight.color.setHex(0xd0e8ff);
+      }
+      if (this.fillLight) {
+        this.fillLight.intensity = 0.50;
+        this.fillLight.color.setHex(0x00f0ff);
+      }
+
+      if (this.exteriorGroundMesh && (this.exteriorGroundMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.exteriorGroundMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0x0e1522);
+        mat.roughness = 0.38;
+        mat.metalness = 0.22;
+      }
+      if (this.truckRoadMesh && (this.truckRoadMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.truckRoadMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0x131c2b);
+        mat.roughness = 0.28;
+        mat.metalness = 0.25;
+      }
+      if (this.roadStripesMesh) {
+        this.roadStripesMesh.material = new THREE.MeshBasicMaterial({
+          color: 0x00f0ff,
+          transparent: true,
+          opacity: 0.85
+        });
+      }
+    } else {
+      // 明亮展厅沙盘模式：对齐 cover.jpg 原版明亮展台实物风格
+      this.scene.background = new THREE.Color(0xe7eef6);
+      this.scene.fog = new THREE.Fog(0xe7eef6, 80, 200);
+
+      if (this.ambientLight) {
+        this.ambientLight.intensity = 0.90;
+        this.ambientLight.color.setHex(0xffffff);
+      }
+      if (this.hemiLight) {
+        this.hemiLight.intensity = 0.65;
+        this.hemiLight.color.setHex(0xffffff);
+      }
+      if (this.sunLight) {
+        this.sunLight.intensity = 1.35;
+        this.sunLight.color.setHex(0xffffff);
+      }
+      if (this.fillLight) {
+        this.fillLight.intensity = 0.45;
+        this.fillLight.color.setHex(0xd9e8f8);
+      }
+
+      if (this.exteriorGroundMesh && (this.exteriorGroundMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.exteriorGroundMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0xdce5ef);
+        mat.roughness = 0.45;
+        mat.metalness = 0.10;
+      }
+      if (this.truckRoadMesh && (this.truckRoadMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.truckRoadMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0xcad5e1);
+        mat.roughness = 0.35;
+        mat.metalness = 0.15;
+      }
+      if (this.roadStripesMesh) {
+        this.roadStripesMesh.material = new THREE.MeshBasicMaterial({
+          color: 0xffffff
+        });
+      }
+    }
+  }
+
+  public toggleTheme(): 'studio' | 'cyber' {
+    const next = this.currentTheme === 'studio' ? 'cyber' : 'studio';
+    this.setTheme(next);
+    return next;
   }
 
   public setTrackedAnchor(anchorPos: [number, number, number], targetMesh: THREE.Object3D | null = null) {
@@ -462,9 +723,23 @@ export class WarehouseScene {
       this.accumulatedTime += delta;
     }
 
-    // 1. AGV 沿正交中线巡线作业
+    // 0. 工业机械臂点动平滑拣选姿态
+    if (this.robotArmNodes.length > 0) {
+      this.robotArmNodes.forEach((arm) => {
+        const swing = Math.sin(this.accumulatedTime * 1.6 + arm.phase) * 0.26;
+        arm.turntable.rotation.z = swing;
+        arm.wrist.rotation.z = Math.cos(this.accumulatedTime * 2.2 + arm.phase) * 0.38;
+      });
+    }
+
+    // 0.1 漂浮微光粒子轻微游弋
+    if (this.cyberParticles) {
+      this.cyberParticles.rotation.y = this.accumulatedTime * 0.035;
+    }
+
+    // 1. AGV 真实闭环物流作业状态机 (接驳装载 ➔ 重载运送 ➔ 机械臂/货垛卸货 ➔ 空车回流)
     if (this.agvRobots.length > 0) {
-      this.agvRobots.forEach((item) => {
+      this.agvRobots.forEach((item, idx) => {
         const t = (this.accumulatedTime * 0.035 + item.offset) % 1.0;
         const pt = this.agvCurve.getPointAt(t);
         const tangent = this.agvCurve.getTangentAt(t);
@@ -472,15 +747,35 @@ export class WarehouseScene {
         item.node.position.set(pt.x, 0.1, pt.z);
         const dir = new THREE.Vector3(tangent.x, 0, tangent.z).normalize();
         item.node.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
+
+        // 状态机流转判定：
+        // 阶段 A: [0.06, 0.62] -> 【重载运输阶段】
+        // 从 1 号月台末端 (X = -7.2, Z = -5.5) 接驳装载纸箱，经西、南主干道运往东侧立体立垛/分拣岛
+        // 阶段 B: [0.62, 1.00] 或 [0.00, 0.06] -> 【空车巡航阶段】
+        // 东区卸货后变为空载状态，经由北侧主干道空车回流，驶往 1 号月台接驳位准备接货
+        const isLoaded = t >= 0.06 && t < 0.62;
+        if (item.cargoMesh.visible !== isLoaded) {
+          item.cargoMesh.visible = isLoaded;
+          item.hasCargo = isLoaded;
+          // 每次在月台新装载时，与传送带物料一致交替颜色 (牛皮纸箱 / 白色薄膜箱)
+          if (isLoaded) {
+            const cycle = Math.floor(this.accumulatedTime * 0.035 + item.offset);
+            const isKraft = (idx + cycle) % 2 === 0;
+            item.cargoMesh.material = isKraft ? this.agvKraftMat : this.agvWhiteMat;
+          }
+        }
       });
     }
 
-    // 2. 传送带纸箱动态流
+    // 2. 传送带纸箱动态流 (自冷链车厢经伸缩滚筒驳运至月台尽头，与 AGV 接驳位精准咬合)
     if (this.conveyorCargoList.length > 0) {
       this.conveyorCargoList.forEach((item) => {
-        const t = (this.accumulatedTime * 0.10 + item.offset) % 1.0;
-        const curX = -15.5 + t * 7.5;
-        item.mesh.position.set(curX, 0.94, -5.5);
+        const t = (this.accumulatedTime * 0.11 + item.offset) % 1.0;
+        // 起点在卡车车厢内 X = -15.8，终点在伸缩流水线末端 X = -7.4 (正对 AGV 接驳工位)
+        const curX = -15.8 + t * 8.4;
+        // 当货箱到达传送带末端 (t > 0.86) 正对 AGV 车顶，微调高度模拟平滑移载
+        const curY = t > 0.86 ? 0.94 - (t - 0.86) * 1.8 : 0.94;
+        item.mesh.position.set(curX, Math.max(0.68, curY), -5.5);
       });
     }
 
