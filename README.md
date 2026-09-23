@@ -6,6 +6,7 @@
 [![Vite](https://img.shields.io/badge/Vite-5.4-646cff?style=for-the-badge&logo=vite)](https://vitejs.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-r169-black?style=for-the-badge&logo=threedotjs)](https://threejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Author: Xxcool](https://img.shields.io/badge/Author-Xxcool-181717?style=for-the-badge&logo=github)](https://github.com/Xxcool)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 🔗 **公网在线体验地址 (Live Demo)**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)
@@ -125,6 +126,12 @@ npm run preview
 | `0` / `R` | 复位为标准等轴测默认视角 (Reset View) |
 | `T` | 切换为垂直平面俯瞰视角 (Top View) |
 | `Space` (空格) | 暂停 / 恢复场景内所有物流运动动画 |
+
+---
+
+## 👨‍💻 作者 (Author)
+
+* **Xxcool** - [GitHub (@Xxcool)](https://github.com/Xxcool) · [掘金技术主页](https://juejin.cn/user/4265760845468296/pins)
 
 ---
 
