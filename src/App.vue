@@ -4,13 +4,14 @@
     <LoadingOverlay ref="loadingRef" />
 
     <!-- 顶部数字化大屏管控中心 Header (52px 极简全息条) -->
-    <HeaderBar :theme="currentTheme" @toggle-theme="handleToggleTheme" />
+    <HeaderBar v-if="!isCleanMode" :theme="currentTheme" @toggle-theme="handleToggleTheme" />
 
     <!-- 左侧：全息运营态势监控 HUD (吞吐量 / AGV 调度 / 立垛库容) -->
-    <LeftTelemetryHud />
+    <LeftTelemetryHud v-if="!isCleanMode" />
 
     <!-- 右侧：设施负荷监控 + 3D 视角多维控制坞 HUD -->
     <RightEquipmentHud
+      v-if="!isCleanMode"
       ref="controlsRef"
       @zoom-in="handleZoomIn"
       @zoom-out="handleZoomOut"
@@ -20,7 +21,7 @@
     />
 
     <!-- 底部操作提示栏 (深色磨砂微晶胶囊) -->
-    <TipBar />
+    <TipBar v-if="!isCleanMode" />
 
     <!-- 3D 实体吸附与自适应防越界弹窗 (暗色微晶科技卡片) -->
     <AnchoredPopup
@@ -64,6 +65,7 @@ const popupPos = ref({ x: 0, y: 0 });
 const popupBehind = ref(false);
 
 const currentTheme = ref<'cyber' | 'studio'>('cyber');
+const isCleanMode = ref(typeof window !== 'undefined' && window.location.search.includes('clean=1'));
 
 function handleToggleTheme() {
   if (sceneInstance) {
