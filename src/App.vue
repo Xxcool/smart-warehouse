@@ -192,7 +192,9 @@ onMounted(async () => {
         sceneInstance.focusOnTruckCockpit();
       }
       if (window.location.search.includes('preview=popup')) {
-        (window as any).__showEntityPopup?.('pc_workstation');
+        const urlParams = new URLSearchParams(window.location.search);
+        const target = (urlParams.get('target') as EntityKey) || 'pc_workstation';
+        sceneInstance.selectEntityByKey(target);
       }
     }
   } catch (err: any) {

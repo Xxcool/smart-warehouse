@@ -1074,6 +1074,21 @@ export class WarehouseScene {
     );
   }
 
+  public selectEntityByKey(key: EntityKey) {
+    const targetObj = this.interactiveMeshes.find((m) => m.userData.entityKey === key);
+    if (targetObj) {
+      const box = new THREE.Box3().setFromObject(targetObj);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const anchorPos: [number, number, number] = [center.x, box.max.y + 0.35, center.z];
+      this.setTrackedAnchor(anchorPos, targetObj);
+      this.focusOnEntity(key, anchorPos, false);
+      if (this.onPickCallback) {
+        this.onPickCallback(key, anchorPos, false);
+      }
+    }
+  }
+
   public toggleAnimation(): boolean {
     this.isAnimationPaused = !this.isAnimationPaused;
     return this.isAnimationPaused;
