@@ -40,6 +40,11 @@ export class WarehouseScene {
   private cargoLineMeshes: THREE.Mesh[] = [];
   private glassWallMeshes: THREE.Mesh[] = [];
   private mullionMeshes: THREE.Mesh[] = [];
+  private cyberInteriorLight: THREE.PointLight | null = null;
+  private holoScreenPanelMesh: THREE.Mesh | null = null;
+  private holoScreenBorderMesh: THREE.Mesh | null = null;
+  private holoStandMeshes: THREE.Mesh[] = [];
+  private holoScreenTexture: THREE.CanvasTexture | null = null;
   private ambientLight: THREE.AmbientLight | null = null;
   private hemiLight: THREE.HemisphereLight | null = null;
   private sunLight: THREE.DirectionalLight | null = null;
@@ -68,8 +73,8 @@ export class WarehouseScene {
 
     // 1. 场景
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x080d17);
-    this.scene.fog = new THREE.Fog(0x080d17, 50, 160);
+    this.scene.background = new THREE.Color(0x0a101b);
+    this.scene.fog = new THREE.Fog(0x0a101b, 65, 200);
 
     // 2. 相机 (34° FOV 保证整仓完整居中铺满，优化近远裁剪面杜绝大场景深度缓冲精度不足)
     const w = this.container.clientWidth || window.innerWidth;
@@ -143,9 +148,159 @@ export class WarehouseScene {
     this.scene.add(this.fillLight);
 
     // 室内柔和科技冷光，照亮深色高反光地坪与机械臂
-    const cyberInteriorLight = new THREE.PointLight(0x00e5ff, 1.6, 40, 1.2);
-    cyberInteriorLight.position.set(0, 5.2, 0);
-    this.scene.add(cyberInteriorLight);
+    this.cyberInteriorLight = new THREE.PointLight(0x00e5ff, 2.4, 55, 1.1);
+    this.cyberInteriorLight.position.set(0, 5.8, 0);
+    this.scene.add(this.cyberInteriorLight);
+  }
+
+  private createHoloScreenTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 576;
+    const ctx = canvas.getContext('2d')!;
+
+    // 1. 深色微晶科技背景与网格
+    ctx.fillStyle = '#06101c';
+    ctx.fillRect(0, 0, 1024, 576);
+
+    // 细密科技网格
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.10)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= 1024; x += 32) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 576);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= 576; y += 32) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(1024, y);
+      ctx.stroke();
+    }
+
+    // 2. 外部科技边框与四角直角切角标
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.50)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(16, 16, 992, 544);
+
+    const cornerLen = 24;
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 4;
+    // 左上
+    ctx.beginPath(); ctx.moveTo(14, 14 + cornerLen); ctx.lineTo(14, 14); ctx.lineTo(14 + cornerLen, 14); ctx.stroke();
+    // 右上
+    ctx.beginPath(); ctx.moveTo(1010 - cornerLen, 14); ctx.lineTo(1010, 14); ctx.lineTo(1010, 14 + cornerLen); ctx.stroke();
+    // 左下
+    ctx.beginPath(); ctx.moveTo(14, 562 - cornerLen); ctx.lineTo(14, 562); ctx.lineTo(14 + cornerLen, 562); ctx.stroke();
+    // 右下
+    ctx.beginPath(); ctx.moveTo(1010 - cornerLen, 562); ctx.lineTo(1010, 562); ctx.lineTo(1010, 562 - cornerLen); ctx.stroke();
+
+    // 3. 顶部大屏标题条
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
+    ctx.fillRect(20, 20, 984, 56);
+    ctx.fillStyle = '#00f0ff';
+    ctx.font = 'bold 24px "Orbitron", "Inter", sans-serif';
+    ctx.fillText('智慧仓储数字孪生全域监控看板 · TELEMETRY MONITOR', 42, 56);
+
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.arc(950, 48, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('ONLINE', 965, 53);
+
+    // 4. 左侧指标模块：AGV 运力态势
+    ctx.fillStyle = 'rgba(11, 23, 40, 0.75)';
+    ctx.fillRect(40, 100, 440, 200);
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(40, 100, 440, 200);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('AGV 集群运力与实时调度态势', 60, 134);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 36px "Orbitron", sans-serif';
+    ctx.fillText('7 / 7', 60, 184);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('全域集群在线  |  激光导引精度 ±2mm', 160, 178);
+
+    // 虚拟动态折线
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const pts = [140, 165, 130, 175, 120, 180, 150, 190, 145, 195, 160, 210];
+    for (let i = 0; i < pts.length; i++) {
+      const px = 60 + i * 32;
+      const py = 280 - (pts[i] - 100);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // 5. 右侧指标模块：高位立垛与冷链仓
+    ctx.fillStyle = 'rgba(11, 23, 40, 0.75)';
+    ctx.fillRect(520, 100, 460, 200);
+    ctx.strokeRect(520, 100, 460, 200);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('气密恒温冷链仓与立垛库容遥测', 540, 134);
+
+    ctx.fillStyle = '#00f0ff';
+    ctx.font = 'bold 36px "Orbitron", sans-serif';
+    ctx.fillText('-18.2 °C', 540, 184);
+    ctx.fillStyle = '#10b981';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('温控 100% 达标  |  微气压差 +25Pa', 710, 178);
+
+    // 进度条
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(540, 220, 420, 12);
+    ctx.fillStyle = '#00f0ff';
+    ctx.fillRect(540, 220, 370, 12);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('立库容积率: 88.4% (708 / 800 托)', 540, 255);
+
+    // 6. 底部工位与自动化月台流水状态
+    ctx.fillStyle = 'rgba(11, 23, 40, 0.75)';
+    ctx.fillRect(40, 320, 940, 210);
+    ctx.strokeRect(40, 320, 940, 210);
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('3大月台出入库泊位联动  &  六轴工业机械臂拣选台', 60, 354);
+
+    const docks = [
+      { name: '1号月台 (伸缩滚筒)', stat: '高速驳运中 · 120件/分', color: '#10b981' },
+      { name: '2号月台 (冷链重挂)', stat: '生鲜密封对接 · -18°C', color: '#38bdf8' },
+      { name: '3号月台 (干线厢车)', stat: '整托出库 · 准备离泊', color: '#f59e0b' }
+    ];
+
+    docks.forEach((d, idx) => {
+      const dx = 60 + idx * 310;
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(dx, 380, 290, 120);
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.strokeRect(dx, 380, 290, 120);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(d.name, dx + 16, 415);
+
+      ctx.fillStyle = d.color;
+      ctx.font = '14px sans-serif';
+      ctx.fillText(d.stat, dx + 16, 450);
+    });
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
   }
 
   private initCyberParticles() {
@@ -246,7 +401,7 @@ export class WarehouseScene {
   public loadModel(onProgress?: (percent: number, items: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       const gltfLoader = new GLTFLoader();
-      const modelUrl = '/smart_warehouse.glb?v=2.2.0';
+      const modelUrl = '/smart_warehouse.glb?v=2.2.1';
 
       gltfLoader.load(
         modelUrl,
@@ -344,14 +499,43 @@ export class WarehouseScene {
                 child.receiveShadow = false;
                 child.renderOrder = 5;
               } else if (n === 'Holo_Screen_Panel') {
-                // 4. 室内悬浮全息微晶看板
+                // 4. 室内发光全息管控看板 (投射高科技动态态势 UI)
+                this.holoScreenPanelMesh = child as THREE.Mesh;
                 child.castShadow = false;
-                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-                  color: 0x00f3ff,
-                  transparent: true,
-                  opacity: 0.55,
-                  side: THREE.DoubleSide,
-                  depthWrite: false
+                child.receiveShadow = false;
+                if (!this.holoScreenTexture) {
+                  this.holoScreenTexture = this.createHoloScreenTexture();
+                }
+                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+                  map: this.holoScreenTexture,
+                  emissive: 0xffffff,
+                  emissiveMap: this.holoScreenTexture,
+                  emissiveIntensity: 0.65,
+                  roughness: 0.20,
+                  metalness: 0.10,
+                  side: THREE.DoubleSide
+                });
+              } else if (n === 'Holo_Screen_Border') {
+                // 4.1 全息大屏钛合金外框与微光包边
+                this.holoScreenBorderMesh = child as THREE.Mesh;
+                child.castShadow = true;
+                child.receiveShadow = true;
+                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+                  color: 0x1f3452,
+                  roughness: 0.25,
+                  metalness: 0.80,
+                  emissive: 0x004466,
+                  emissiveIntensity: 0.35
+                });
+              } else if (n.startsWith('Holo_Stand_')) {
+                // 4.2 全息大屏金属落地支撑脚架
+                this.holoStandMeshes.push(child as THREE.Mesh);
+                child.castShadow = true;
+                child.receiveShadow = true;
+                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+                  color: 0x475569,
+                  roughness: 0.30,
+                  metalness: 0.85
                 });
               } else {
                 child.castShadow = true;
@@ -485,32 +669,35 @@ export class WarehouseScene {
   public setTheme(theme: 'studio' | 'cyber') {
     this.currentTheme = theme;
     if (theme === 'cyber') {
-      // 赛博深空全息模式：与深色微晶 HUD 100% 融合，如同深夜高科技保税仓
-      this.scene.background = new THREE.Color(0x080d17);
-      this.scene.fog = new THREE.Fog(0x080d17, 50, 160);
+      // 赛博深空全息模式：与深色微晶 HUD 100% 融合，通透深青蓝高反光地坪 + 绚丽全息看板
+      this.scene.background = new THREE.Color(0x0a101b);
+      this.scene.fog = new THREE.Fog(0x0a101b, 65, 200);
 
       if (this.ambientLight) {
-        this.ambientLight.intensity = 0.50;
-        this.ambientLight.color.setHex(0x507090);
+        this.ambientLight.intensity = 0.85;
+        this.ambientLight.color.setHex(0x6080a2);
       }
       if (this.hemiLight) {
-        this.hemiLight.intensity = 0.35;
+        this.hemiLight.intensity = 0.55;
         this.hemiLight.color.setHex(0x38bdf8);
       }
       if (this.sunLight) {
-        this.sunLight.intensity = 1.15;
-        this.sunLight.color.setHex(0xd0e8ff);
+        this.sunLight.intensity = 1.25;
+        this.sunLight.color.setHex(0xdbeaff);
       }
       if (this.fillLight) {
-        this.fillLight.intensity = 0.50;
+        this.fillLight.intensity = 0.65;
         this.fillLight.color.setHex(0x00f0ff);
+      }
+      if (this.cyberInteriorLight) {
+        this.cyberInteriorLight.intensity = 2.4;
       }
 
       if (this.warehouseFloorMesh && (this.warehouseFloorMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.warehouseFloorMesh.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(0x101726); // 高反光深灰蓝赛博地坪
-        mat.roughness = 0.20;
-        mat.metalness = 0.30;
+        mat.color.setHex(0x192842); // 具有通透科技感的深青蓝高反光地坪 (彻底告别死黑，阶梯立体对比)
+        mat.roughness = 0.22;
+        mat.metalness = 0.35;
       }
       this.glassWallMeshes.forEach((mesh) => {
         mesh.material = new THREE.MeshPhysicalMaterial({
@@ -531,7 +718,7 @@ export class WarehouseScene {
       this.mullionMeshes.forEach((mesh) => {
         if (mesh.material && (mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
           const mat = mesh.material as THREE.MeshStandardMaterial;
-          mat.color.setHex(0x141f2e);
+          mat.color.setHex(0x1a2b40);
           mat.roughness = 0.25;
           mat.metalness = 0.75;
         }
@@ -542,17 +729,32 @@ export class WarehouseScene {
         }
       });
 
+      if (this.holoScreenPanelMesh && (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial)) {
+        (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.65;
+      }
+      if (this.holoScreenBorderMesh && (this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0x1f3452);
+        mat.emissive.setHex(0x004466);
+        mat.emissiveIntensity = 0.35;
+      }
+      this.holoStandMeshes.forEach((mesh) => {
+        if (mesh.material && (mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+          (mesh.material as THREE.MeshStandardMaterial).color.setHex(0x475569);
+        }
+      });
+
       if (this.exteriorGroundMesh && (this.exteriorGroundMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.exteriorGroundMesh.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(0x0e1522);
-        mat.roughness = 0.38;
-        mat.metalness = 0.22;
+        mat.color.setHex(0x0c1320); // 厂区外围深空夜色，与室内青蓝地坪形成鲜明阶梯明暗对比
+        mat.roughness = 0.45;
+        mat.metalness = 0.15;
       }
       if (this.truckRoadMesh && (this.truckRoadMesh.material as THREE.MeshStandardMaterial)) {
         const mat = this.truckRoadMesh.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(0x131c2b);
-        mat.roughness = 0.28;
-        mat.metalness = 0.25;
+        mat.color.setHex(0x131d2c); // 外侧运输干道沥青色
+        mat.roughness = 0.32;
+        mat.metalness = 0.20;
       }
       if (this.roadStripesMesh) {
         this.roadStripesMesh.material = new THREE.MeshBasicMaterial({
@@ -582,6 +784,9 @@ export class WarehouseScene {
       if (this.fillLight) {
         this.fillLight.intensity = 0.45;
         this.fillLight.color.setHex(0xd9e8f8);
+      }
+      if (this.cyberInteriorLight) {
+        this.cyberInteriorLight.intensity = 0.5;
       }
 
       if (this.warehouseFloorMesh && (this.warehouseFloorMesh.material as THREE.MeshStandardMaterial)) {
@@ -614,6 +819,21 @@ export class WarehouseScene {
       this.cargoLineMeshes.forEach((mesh) => {
         if (mesh.material && (mesh.material as THREE.MeshBasicMaterial).isMeshBasicMaterial) {
           (mesh.material as THREE.MeshBasicMaterial).color.setHex(0xd97706); // 展厅高反差工业暖黄标线
+        }
+      });
+
+      if (this.holoScreenPanelMesh && (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial)) {
+        (this.holoScreenPanelMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.20;
+      }
+      if (this.holoScreenBorderMesh && (this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial)) {
+        const mat = this.holoScreenBorderMesh.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(0x475569);
+        mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0;
+      }
+      this.holoStandMeshes.forEach((mesh) => {
+        if (mesh.material && (mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+          (mesh.material as THREE.MeshStandardMaterial).color.setHex(0x64748b);
         }
       });
 
