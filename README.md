@@ -11,6 +11,10 @@
 
 🔗 **公网在线体验地址 (Live Demo)**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)
 
+<div align="center">
+  <img src="docs/images/04_final_digital_twin.png" alt="智慧仓储数字孪生管控大屏运行全景" width="100%" />
+</div>
+
 一个基于 **Vue 3 + Vite + TypeScript + Three.js** 与 **Blender 5.2.2 LTS 高精建模** 的现代化工业级 3D 智慧物流与冷链数字孪生管控大屏系统。
 
 ---
@@ -57,8 +61,11 @@
 
 ```text
 smart-warehouse/
+├── docs/                          # 场景设计、架构规范与全景图集
+│   ├── ARCHITECTURE.md            # Three.js 场景管理器与性能优化架构文档
+│   └── images/                    # 高清场景效果图
 ├── public/
-│   ├── smart_warehouse.glb        # Blender 高精三维孪生模型
+│   ├── smart_warehouse.glb        # Blender 高精三维孪生模型 (~1.8 MB)
 │   └── models/
 ├── src/
 │   ├── components/
@@ -89,7 +96,8 @@ smart-warehouse/
 ## 🚀 本地快速启动 (Local Development)
 
 ```bash
-# 1. 克隆或进入项目目录
+# 1. 克隆并进入项目目录
+git clone https://github.com/Xxcool/smart-warehouse.git
 cd smart-warehouse
 
 # 2. 安装依赖
@@ -131,7 +139,7 @@ npm run preview
 
 ## 👨‍💻 作者 (Author)
 
-* **Xxcool** - [GitHub (@Xxcool)](https://github.com/Xxcool) · [掘金技术主页](https://juejin.cn/user/4265760845468296/pins)
+* **Xxcool** - [GitHub (@Xxcool)](https://github.com/Xxcool) · [掘金技术主页](https://juejin.cn/user/4265760845468296/posts)
 
 ---
 
