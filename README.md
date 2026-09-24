@@ -1,5 +1,9 @@
 # 智慧仓储数字孪生平台 (smart-warehouse)
 
+<p align="left">
+  <b>简体中文</b> | <a href="./README_EN.md">English</a>
+</p>
+
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Online-success?style=for-the-badge&logo=vercel)](https://smart-warehouse-wine.vercel.app)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883?style=for-the-badge&logo=vuedotjs)](https://vuejs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646cff?style=for-the-badge&logo=vite)](https://vitejs.dev/)
@@ -92,7 +96,8 @@ smart-warehouse/
 │   └── main.ts                    # 入口文件
 ├── index.html                     # 页面 HTML
 ├── package.json                   # 项目依赖配置
-└── README.md                      # 项目说明文档
+├── README.md                      # 中文项目说明文档
+└── README_EN.md                   # 英文项目说明文档 (English Documentation)
 ```
 
 ---
