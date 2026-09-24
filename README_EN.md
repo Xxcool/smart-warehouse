@@ -98,28 +98,28 @@ The platform separates rendering concerns into a modular multi-tier architecture
 
 ```mermaid
 flowchart TD
-    subgraph UI_Layer [View & Cyber HUD Layer (Vue 3 SFC)]
-        A1[HeaderBar.vue - Mission Header & Weather Clock]
-        A2[LeftTelemetryHud.vue - Operation Telemetry HUD]
-        A3[RightEquipmentHud.vue - Facilities & 3D Camera Dock]
-        A4[AnchoredPopup.vue - 3D Entity Anchored Popup]
-        A5[LoadingOverlay.vue - Holographic Init Dock & Telemetry]
-        A6[TipBar.vue - Interaction Tip Capsule]
+    subgraph UI_Layer ["View & Cyber HUD Layer (Vue 3 SFC)"]
+        A1["HeaderBar.vue - Mission Header & Weather Clock"]
+        A2["LeftTelemetryHud.vue - Operation Telemetry HUD"]
+        A3["RightEquipmentHud.vue - Facilities & 3D Camera Dock"]
+        A4["AnchoredPopup.vue - 3D Entity Anchored Popup"]
+        A5["LoadingOverlay.vue - Holographic Init Dock & Telemetry"]
+        A6["TipBar.vue - Interaction Tip Capsule"]
     end
 
-    subgraph Core_Layer [3D Digital Twin Engine (TypeScript)]
-        B1[WarehouseScene - Scene/Camera/Sunlight/Shadows]
-        B2[ThemeEngine - Cyber Immersion / Studio Day Themes]
-        B3[ModelLoader - Streaming GLB Asset Pipeline]
-        B4[AgvController - AGV Finite State Machine & Cargo Loop]
-        B5[TruckController - Road Cruising & Wheel Dynamics]
-        B6[ConveyorController - Dock Roller Sorters]
-        B7[RaycasterPicker - 3D Raycasting & Screen Projection]
+    subgraph Core_Layer ["3D Digital Twin Engine (TypeScript)"]
+        B1["WarehouseScene - Scene / Camera / Sunlight / Shadows"]
+        B2["ThemeEngine - Cyber Immersion / Studio Day Themes"]
+        B3["ModelLoader - Streaming GLB Asset Pipeline"]
+        B4["AgvController - AGV Finite State Machine & Cargo Loop"]
+        B5["TruckController - Road Cruising & Wheel Dynamics"]
+        B6["ConveyorController - Dock Roller Sorters"]
+        B7["RaycasterPicker - 3D Raycasting & Screen Projection"]
     end
 
-    subgraph Data_Layer [Data Dictionary & Telemetry]
-        C1[constants.ts - IoT Sensor Metrics Dictionary]
-        C2[warehouse.ts - TypeScript Domain Type System]
+    subgraph Data_Layer ["Data Dictionary & Telemetry"]
+        C1["constants.ts - IoT Sensor Metrics Dictionary"]
+        C2["warehouse.ts - TypeScript Domain Type System"]
     end
 
     UI_Layer <--> Core_Layer

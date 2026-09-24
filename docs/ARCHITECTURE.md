@@ -12,28 +12,28 @@
 
 ```mermaid
 flowchart TD
-    subgraph UI_Layer [大屏视图表现层 (Vue 3 SFC & Cyber HUD)]
-        A1[HeaderBar.vue 52px 极简指挥顶栏与实时气象时钟]
-        A2[LeftTelemetryHud.vue 左翼：全息运营态势监控 HUD]
-        A3[RightEquipmentHud.vue 右翼：设施负荷与 3D 视角控制坞]
-        A4[AnchoredPopup.vue 3D 实体吸附与自适应微晶弹窗]
-        A5[LoadingOverlay.vue 全息初始化控制舱与三阶段遥测]
-        A6[TipBar.vue 底部微晶交互指引胶囊]
+    subgraph UI_Layer ["大屏视图表现层 (Vue 3 SFC & Cyber HUD)"]
+        A1["HeaderBar.vue 52px 极简指挥顶栏与实时气象时钟"]
+        A2["LeftTelemetryHud.vue 左翼：全息运营态势监控 HUD"]
+        A3["RightEquipmentHud.vue 右翼：设施负荷与 3D 视角控制坞"]
+        A4["AnchoredPopup.vue 3D 实体吸附与自适应微晶弹窗"]
+        A5["LoadingOverlay.vue 全息初始化控制舱与三阶段遥测"]
+        A6["TipBar.vue 底部微晶交互指引胶囊"]
     end
 
-    subgraph Core_Layer [3D 数字孪生底层引擎 (TypeScript Class)]
-        B1[SceneManager 场景/相机/日光/软阴影]
-        B2[ThemeEngine 赛博深空 / 白昼展厅双主题渲染引擎]
-        B3[ModelLoader Blender GLB 资产流式加载]
-        B4[AgvClosedLoopController AGV 状态机与物料装卸闭环]
-        B5[TruckController 干线公路巡航与车轮动力学联动]
-        B6[ConveyorController 月台滚筒流水线多彩货物循环]
-        B7[RaycasterPicker 空间射线拾取与 3D-to-2D 投影]
+    subgraph Core_Layer ["3D 数字孪生底层引擎 (TypeScript Class)"]
+        B1["SceneManager 场景 / 相机 / 日光 / 软阴影"]
+        B2["ThemeEngine 赛博深空 / 白昼展厅双主题渲染引擎"]
+        B3["ModelLoader Blender GLB 资产流式加载"]
+        B4["AgvClosedLoopController AGV 状态机与物料装卸闭环"]
+        B5["TruckController 干线公路巡航与车轮动力学联动"]
+        B6["ConveyorController 月台滚筒流水线多彩货物循环"]
+        B7["RaycasterPicker 空间射线拾取与 3D-to-2D 投影"]
     end
 
-    subgraph Data_Layer [数据字典与遥测层]
-        C1[constants.ts 库区设备传感指标数据字典]
-        C2[warehouse.ts TypeScript 领域类型体系]
+    subgraph Data_Layer ["数据字典与遥测层"]
+        C1["constants.ts 库区设备传感指标数据字典"]
+        C2["warehouse.ts TypeScript 领域类型体系"]
     end
 
     UI_Layer <--> Core_Layer
