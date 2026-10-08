@@ -14,7 +14,7 @@
 
 🔗 **在线体验地址**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)
 
-https://github.com/user-attachments/assets/9af74f57-ff19-48f3-98a6-6dae3e1dccbd
+https://github.com/user-attachments/assets/5553a66b-b971-490b-9796-02419c6d1a51
 
 基于 **Vue 3 + Vite + TypeScript + Three.js** 构建的 3D 智慧仓储与物流数字孪生管控平台。直观还原现代化智能物流园区的运转实况，包括自动化 AGV 物料循环搬运、立体仓库出入库、冷链气密仓恒温监控以及月台货车装卸流程，支持科技夜景与明亮白昼双风格切换。
 
