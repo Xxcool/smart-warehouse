@@ -15,7 +15,9 @@
 🔗 **在线体验地址**：[https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)
 
 <div align="center">
-  <img src="docs/images/15_cyber_digital_twin.png" alt="智慧仓储数字孪生管控大屏运行全景" width="100%" />
+  <a href="https://smart-warehouse-wine.vercel.app">
+    <img src="docs/images/demo.gif" alt="智慧仓储数字孪生管控大屏动态演示" width="100%" />
+  </a>
 </div>
 
 基于 **Vue 3 + Vite + TypeScript + Three.js** 构建的 3D 智慧仓储与物流数字孪生管控平台。直观还原现代化智能物流园区的运转实况，包括自动化 AGV 物料循环搬运、立体仓库出入库、冷链气密仓恒温监控以及月台货车装卸流程，支持科技夜景与明亮白昼双风格切换。
