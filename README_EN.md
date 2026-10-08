@@ -14,11 +14,7 @@
 
 🔗 **Live Demo**: [https://smart-warehouse-wine.vercel.app](https://smart-warehouse-wine.vercel.app)
 
-<div align="center">
-  <a href="https://smart-warehouse-wine.vercel.app">
-    <img src="docs/images/demo.gif" alt="Smart Warehouse Digital Twin Control Center Live Demo" width="100%" />
-  </a>
-</div>
+https://github.com/user-attachments/assets/9af74f57-ff19-48f3-98a6-6dae3e1dccbd
 
 An industrial-grade 3D smart warehouse and logistics digital twin management platform built with **Vue 3 + Vite + TypeScript + Three.js**. It intuitively reproduces the real-time operations of a modern intelligent logistics park—featuring autonomous AGV closed-loop material handling, automated stereoscopic storage and retrieval (ASRS), cold-chain airtight chamber temperature monitoring, and loading dock truck logistics. Supports seamless zero-latency switching between futuristic Cyber Night and Studio Day visual themes.
 
