@@ -20,7 +20,7 @@ An industrial-grade 3D smart warehouse and logistics digital twin management pla
 
 ## 🎬 Intro Video
 
-[![▶ Play the intro video (30s)](docs/video/cover.png)](docs/video/smart-warehouse-intro.mp4)
+https://github.com/user-attachments/assets/c100f24e-c684-498b-a913-01fa0e48ea68
 
 > **30s · 1920×1080 · 16:9 · 30fps**｜Digital twin panorama → AGV loop → truck PBR → holographic telemetry → dual-theme switch → tech stack → outro.
 
