@@ -21,7 +21,6 @@
 ## 🎬 项目介绍视频 (Intro Video)
 
 [![▶ 播放项目介绍视频（30 秒）](docs/video/cover.png)](docs/video/smart-warehouse-intro.mp4)
-https://github.com/user-attachments/assets/e74b58a7-14e9-4cc9-ba8f-b620196285c2
 
 > **30 秒 · 1920×1080 · 16:9 · 30fps**｜数字孪生全景 → AGV 闭环 → 货车 PBR → 全息遥测 → 双主题切换 → 技术栈 → 收尾。
 
