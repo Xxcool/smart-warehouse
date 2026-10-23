@@ -20,8 +20,17 @@ An industrial-grade 3D smart warehouse and logistics digital twin management pla
 
 ---
 
+## 🎬 Intro Video
+
+[![▶ Play the intro video (30s)](video-intro/cover.png)](video-intro/out/smart-warehouse-intro.mp4)
+
+> **30s · 1920×1080 · 16:9 · 30fps**｜Deterministic, frame-driven rendering with **Remotion**: digital twin panorama → AGV loop → truck PBR → holographic telemetry → dual-theme switch → tech stack → outro. A unified timeline plus fixed seeds make every re-render frame-identical. Source & re-export guide: [`video-intro/`](video-intro/README.md).
+
+---
+
 ## 📑 Table of Contents
 
+- [🎬 Intro Video](#intro-video)
 - [📸 Showcase](#showcase)
 - [🌟 Key Features](#key-features)
 - [🛠️ Tech Stack](#tech-stack)

@@ -20,6 +20,14 @@ https://github.com/user-attachments/assets/5553a66b-b971-490b-9796-02419c6d1a51
 
 ---
 
+## 🎬 项目介绍视频 (Intro Video)
+
+[![▶ 播放项目介绍视频（30 秒）](video-intro/cover.png)](video-intro/out/smart-warehouse-intro.mp4)
+
+> **30 秒 · 1920×1080 · 16:9 · 30fps**｜基于 **Remotion** 帧驱动确定性渲染：数字孪生全景 → AGV 闭环 → 货车 PBR → 全息遥测 → 双主题切换 → 技术栈 → 收尾；统一时间轴 + 固定种子，同一份源码可逐帧复现。源码与重导出方法见 [`video-intro/`](video-intro/README.md)。
+
+---
+
 ## 📸 效果展示 (Showcase)
 
 | 🌙 赛博夜景模式 | ☀️ 白昼展厅模式 |
