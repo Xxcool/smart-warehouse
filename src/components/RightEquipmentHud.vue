@@ -1,6 +1,5 @@
 <template>
   <aside class="right-equipment-hud" aria-label="设施与环境全息监控">
-    <div id="warehouse-facilities" class="equipment-metrics" :class="{ 'panel-open': expanded }">
     <!-- 模块 1：月台泊位负荷 -->
     <div class="hud-card">
       <div class="hud-card-header">
@@ -85,8 +84,6 @@
       </div>
     </div>
 
-    </div>
-
     <!-- 模块 3：3D 场景与视角控制坞 -->
     <div class="hud-card controls-card">
       <div class="hud-card-header compact">
@@ -138,8 +135,7 @@
         title="暂停/恢复场景内 AGV 与传送带运动 (快捷键 空格)"
       >
         <span class="playback-icon">{{ isPaused ? '▶' : '⏸' }}</span>
-        <span class="playback-label">{{ isPaused ? '恢复场景物流运动' : '暂停场景物流运动' }}</span>
-        <span class="playback-label-short" aria-hidden="true">{{ isPaused ? '继续' : '暂停' }}</span>
+        <span>{{ isPaused ? '恢复场景物流运动' : '暂停场景物流运动' }}</span>
       </button>
     </div>
   </aside>
@@ -151,7 +147,6 @@ import type { ViewMode } from '../types/warehouse';
 defineProps<{
   currentMode: ViewMode;
   isPaused: boolean;
-  expanded: boolean;
 }>();
 
 defineEmits<{
@@ -176,12 +171,6 @@ defineEmits<{
   width: 290px;
   pointer-events: auto;
   user-select: none;
-}
-
-.equipment-metrics {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 /* 赛博微晶卡片基础 */
@@ -481,8 +470,5 @@ defineEmits<{
 }
 .playback-icon {
   font-size: 12px;
-}
-.playback-label-short {
-  display: none;
 }
 </style>

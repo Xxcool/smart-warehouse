@@ -1,34 +1,19 @@
 <template>
-  <div class="smart-warehouse-app" :class="{ 'is-compact': isCompact }">
+  <div class="smart-warehouse-app">
     <LoadingOverlay ref="loadingRef" @retry="initializeScene" />
 
-    <div v-if="!isCleanMode" class="hud-layer" :inert="!sceneReady">
+    <div v-if="!isCleanMode" class="hud-layer" :style="{ '--hud-scale': hudScale }" :inert="!sceneReady">
       <HeaderBar :theme="currentTheme" @toggle-theme="handleToggleTheme" />
-      <LeftTelemetryHud :fleet="fleet" :is-paused="isPaused" :expanded="openPanel === 'operations'" />
+      <LeftTelemetryHud :fleet="fleet" :is-paused="isPaused" />
       <RightEquipmentHud
         :current-mode="viewMode"
         :is-paused="isPaused"
-        :expanded="openPanel === 'facilities'"
         @zoom-in="handleZoom(0.80)"
         @zoom-out="handleZoom(1.25)"
         @reset-view="handleResetView"
         @top-view="handleTopView"
         @toggle-play="handleTogglePlay"
       />
-      <nav v-if="isCompact" class="compact-panel-switcher" aria-label="仓储指标面板">
-        <button
-          type="button"
-          aria-controls="warehouse-operations"
-          :aria-expanded="openPanel === 'operations'"
-          @click="togglePanel('operations')"
-        >运营态势</button>
-        <button
-          type="button"
-          aria-controls="warehouse-facilities"
-          :aria-expanded="openPanel === 'facilities'"
-          @click="togglePanel('facilities')"
-        >设施与冷链</button>
-      </nav>
       <TipBar />
     </div>
 
@@ -61,7 +46,6 @@ import { AGV_PHASE_LABELS } from './core/agvSimulation';
 import { ENTITY_DATA } from './core/constants';
 import type { AgvFleet, EntityDetail, EntityKey, EntitySelection, ViewMode } from './types/warehouse';
 
-type CompactPanel = 'operations' | 'facilities';
 const params = new URLSearchParams(window.location.search);
 const isCleanMode = params.get('clean') === '1';
 const canvasContainer = ref<HTMLElement | null>(null);
@@ -70,7 +54,6 @@ const sceneReady = ref(false);
 const viewMode = ref<ViewMode>('reset');
 const isPaused = ref(false);
 const currentTheme = ref<'cyber' | 'studio'>('cyber');
-const openPanel = ref<CompactPanel | null>(null);
 const fleet = ref<AgvFleet>({ vehicles: [], speed: 0, lapSeconds: 0 });
 let sceneInstance: WarehouseScene | null = null;
 
@@ -101,29 +84,24 @@ const popupDetail = computed<EntityDetail | null>(() => {
 });
 
 const viewport = ref({ width: window.innerWidth, height: window.innerHeight });
-const isCompact = computed(() => viewport.value.width <= 1050 || viewport.value.height <= 680);
+const hudScale = computed(() => {
+  const { width, height } = viewport.value;
+  // 保留桌面 HUD 的排布，只在可用尺寸不足时等比缩放。
+  return width && height ? Math.min(1, width / 1120, height / 640) : 1;
+});
 const safeBounds = computed(() => {
-  const margin = isCompact.value || isCleanMode ? 12 : 344;
-  return {
-    left: margin,
-    right: viewport.value.width - margin,
-    bottom: viewport.value.height - (isCompact.value && !isCleanMode ? 138 : 24)
-  };
+  const { width, height } = viewport.value;
+  const margin = !isCleanMode && width >= 1120 ? 344 * hudScale.value : 12;
+  return { left: margin, right: width - margin, bottom: height - 24 };
 });
 
 function handleResize() {
   viewport.value = { width: window.innerWidth, height: window.innerHeight };
-  if (!isCompact.value) openPanel.value = null;
 }
 
 function closePopup() {
   selection.value = null;
   sceneInstance?.clearTrackedAnchor();
-}
-
-function togglePanel(panel: CompactPanel) {
-  openPanel.value = openPanel.value === panel ? null : panel;
-  closePopup();
 }
 
 function handleToggleTheme() {
@@ -180,7 +158,6 @@ function handleKeydown(event: KeyboardEvent) {
       handleZoom(1.18);
       break;
     case 'escape':
-      openPanel.value = null;
       closePopup();
       break;
   }
@@ -201,7 +178,6 @@ async function initializeScene() {
 
   sceneInstance = scene;
   scene.onPick((entity) => {
-    openPanel.value = null;
     selection.value = entity;
     viewMode.value = 'custom';
   });
@@ -311,157 +287,19 @@ html, body {
 }
 
 .hud-layer {
-  display: contents;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  width: calc(100% / var(--hud-scale));
+  height: calc(100% / var(--hud-scale));
+  transform: scale(var(--hud-scale));
+  transform-origin: top left;
+  pointer-events: none;
 }
 
 .smart-warehouse-app button:focus-visible {
   outline: 2px solid #91f3ff;
   outline-offset: 2px;
-}
-
-.smart-warehouse-app.is-compact {
-  --hud-top-inset: env(safe-area-inset-top, 0px);
-  --hud-bottom-inset: env(safe-area-inset-bottom, 0px);
-  --hud-rail-width: min(480px, calc(100% - 24px));
-}
-
-.smart-warehouse-app.is-compact .digital-twin-header {
-  gap: 8px;
-  height: calc(54px + var(--hud-top-inset));
-  padding: var(--hud-top-inset) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
-}
-
-.smart-warehouse-app.is-compact .header-left-group,
-.smart-warehouse-app.is-compact .sub-title-track,
-.smart-warehouse-app.is-compact .weather-card,
-.smart-warehouse-app.is-compact .header-v-divider,
-.smart-warehouse-app.is-compact .clock-card,
-.smart-warehouse-app.is-compact .tip-bar {
-  display: none;
-}
-
-.smart-warehouse-app.is-compact .header-center-group {
-  position: static;
-  align-items: flex-start;
-  transform: none;
-  min-width: 0;
-}
-
-.smart-warehouse-app.is-compact .main-title {
-  font-size: clamp(13px, 4vw, 17px);
-  letter-spacing: 0;
-}
-
-.smart-warehouse-app.is-compact .header-right-group {
-  flex-shrink: 0;
-  gap: 6px;
-}
-
-.smart-warehouse-app.is-compact .theme-toggle-btn,
-.smart-warehouse-app.is-compact .fullscreen-btn {
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-}
-
-.smart-warehouse-app.is-compact .theme-btn-text {
-  display: none;
-}
-
-.smart-warehouse-app.is-compact .right-equipment-hud {
-  display: contents;
-}
-
-.smart-warehouse-app.is-compact .left-telemetry-hud,
-.smart-warehouse-app.is-compact .equipment-metrics {
-  display: none;
-  position: absolute;
-  inset: calc(62px + var(--hud-top-inset)) auto auto 50%;
-  transform: translateX(-50%);
-  z-index: 23;
-  width: var(--hud-rail-width);
-  max-height: calc(100% - 184px - var(--hud-top-inset) - var(--hud-bottom-inset));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  pointer-events: auto;
-}
-
-.smart-warehouse-app.is-compact .left-telemetry-hud.panel-open,
-.smart-warehouse-app.is-compact .equipment-metrics.panel-open {
-  display: flex;
-}
-
-.smart-warehouse-app.is-compact .left-telemetry-hud .hud-card,
-.smart-warehouse-app.is-compact .equipment-metrics .hud-card {
-  flex-shrink: 0;
-}
-
-.smart-warehouse-app.is-compact .controls-card,
-.compact-panel-switcher {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 24;
-  width: var(--hud-rail-width);
-}
-
-.smart-warehouse-app.is-compact .controls-card {
-  bottom: calc(58px + var(--hud-bottom-inset));
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-}
-
-.smart-warehouse-app.is-compact .controls-card .hud-card-header,
-.smart-warehouse-app.is-compact .playback-label {
-  display: none;
-}
-
-.smart-warehouse-app.is-compact .controls-action-grid {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-}
-
-.smart-warehouse-app.is-compact .ctrl-btn,
-.smart-warehouse-app.is-compact .playback-btn {
-  min-height: 44px;
-}
-
-.smart-warehouse-app.is-compact .playback-btn {
-  width: auto;
-  min-width: 64px;
-  gap: 4px;
-  padding-inline: 6px;
-}
-
-.smart-warehouse-app.is-compact .playback-label-short {
-  display: inline;
-}
-
-.compact-panel-switcher {
-  bottom: calc(8px + var(--hud-bottom-inset));
-  display: flex;
-  gap: 6px;
-}
-
-.compact-panel-switcher button {
-  flex: 1;
-  min-height: 44px;
-  border: 1px solid rgba(93, 133, 158, 0.45);
-  border-radius: 9px;
-  background: #101a29;
-  color: #e2e8f0;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.compact-panel-switcher button[aria-expanded="true"] {
-  border-color: #67e8f9;
-  background: #103044;
-  color: #b8f7ff;
 }
 </style>

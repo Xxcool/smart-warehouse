@@ -1,5 +1,5 @@
 <template>
-  <aside id="warehouse-operations" class="left-telemetry-hud" :class="{ 'panel-open': expanded }" aria-label="全息运营态势监控">
+  <aside class="left-telemetry-hud" aria-label="全息运营态势监控">
     <!-- 模块 1：今日仓储吞吐量 -->
     <div class="hud-card">
       <div class="hud-card-header">
@@ -142,7 +142,6 @@ import type { AgvFleet } from '../types/warehouse';
 const props = defineProps<{
   fleet: AgvFleet;
   isPaused: boolean;
-  expanded: boolean;
 }>();
 
 const counts = computed(() => {
