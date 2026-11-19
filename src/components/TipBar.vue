@@ -1,7 +1,7 @@
 <template>
   <div class="tip-bar">
     <span class="tip-icon">💡</span>
-    <span class="tip-text">提示：<b>轻点机械臂工作台、托盘堆、冷库门、AGV小车、传送带或货车</b>即可查看实时传感数据 · 鼠标滚轮/手势可多维缩放 3D 视角</span>
+    <span class="tip-text"><b>轻点场景设备</b>查看仿真状态 · 使用滚轮或双指缩放场景</span>
   </div>
 </template>
 

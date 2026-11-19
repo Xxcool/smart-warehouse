@@ -3,6 +3,8 @@
     v-show="visible && !behindCamera"
     ref="popupEl"
     class="anchored-popup"
+    role="region"
+    aria-label="设备详情"
     :class="placementClass"
     :style="popupStyle"
   >
@@ -14,7 +16,7 @@
         </div>
         <div class="header-action-group">
           <span class="popup-tag">{{ detail?.tag }}</span>
-          <span class="popup-close" @click="$emit('close')" title="关闭">&times;</span>
+          <button type="button" class="popup-close" @click="$emit('close')" aria-label="关闭设备详情">&times;</button>
         </div>
       </div>
 
@@ -42,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { EntityDetail } from '../types/warehouse';
 
 const props = defineProps<{
@@ -51,8 +53,9 @@ const props = defineProps<{
   screenX: number;
   screenY: number;
   behindCamera: boolean;
-  safeLeft?: number;
-  safeRight?: number;
+  safeLeft: number;
+  safeRight: number;
+  safeBottom: number;
 }>();
 
 defineEmits<{
@@ -60,62 +63,59 @@ defineEmits<{
 }>();
 
 const popupEl = ref<HTMLElement | null>(null);
+const cardHeight = ref(0);
+let observer: ResizeObserver | undefined;
 
-const cardW = 310;
-
-const placementClass = computed(() => {
-  const safeTop = 64;
-  if (props.screenY < safeTop + 45) {
-    return 'placement-bottom';
-  }
-  return 'placement-top';
+onMounted(() => {
+  if (!popupEl.value) return;
+  observer = new ResizeObserver(([entry]) => { cardHeight.value = entry.contentRect.height; });
+  observer.observe(popupEl.value);
 });
 
-const isBottom = computed(() => placementClass.value === 'placement-bottom');
+onUnmounted(() => observer?.disconnect());
 
 const clampedPosition = computed(() => {
-  const cardH = popupEl.value?.offsetHeight || 200;
   const safeTop = 64;
-  const safeBottom = window.innerHeight - 24;
-  const safeLeft = props.safeLeft ?? 20;
-  const safeRight = props.safeRight ?? (window.innerWidth - 20);
-
-  const halfW = cardW / 2;
-  const minX = safeLeft + halfW;
-  const maxX = safeRight - halfW;
+  const gap = 14;
+  const width = Math.min(310, props.safeRight - props.safeLeft);
+  const maxHeight = Math.max(0, props.safeBottom - safeTop);
+  const cardH = Math.min(cardHeight.value || 200, maxHeight);
+  const halfW = width / 2;
+  const minX = props.safeLeft + halfW;
+  const maxX = props.safeRight - halfW;
   const clampedX = Math.max(minX, Math.min(maxX, props.screenX));
-
-  let clampedY = props.screenY;
-  if (!isBottom.value) {
-    if (clampedY - 14 - cardH < safeTop) {
-      clampedY = safeTop + cardH + 14;
-    }
-  } else {
-    if (clampedY + 14 + cardH > safeBottom) {
-      clampedY = safeBottom - cardH - 14;
-    }
-  }
-
+  const roomAbove = props.screenY - safeTop - gap;
+  const roomBelow = props.safeBottom - props.screenY - gap;
+  const isBottom = roomAbove < cardH && roomBelow > roomAbove;
+  const desiredTop = isBottom ? props.screenY + gap : props.screenY - gap - cardH;
+  const cardTop = Math.max(safeTop, Math.min(props.safeBottom - cardH, desiredTop));
   const caretOffset = props.screenX - clampedX;
   const maxCaretOffset = halfW - 24;
   const clampedCaretOffset = Math.max(-maxCaretOffset, Math.min(maxCaretOffset, caretOffset));
 
   return {
     x: clampedX,
-    y: clampedY,
+    y: isBottom ? cardTop - gap : cardTop + cardH + gap,
+    width,
+    maxHeight,
+    isBottom,
     caretOffset: clampedCaretOffset
   };
 });
 
+const placementClass = computed(() => clampedPosition.value.isBottom ? 'placement-bottom' : 'placement-top');
+
 const popupStyle = computed(() => {
   return {
     left: `${clampedPosition.value.x}px`,
-    top: `${clampedPosition.value.y}px`
+    top: `${clampedPosition.value.y}px`,
+    width: `${clampedPosition.value.width}px`,
+    '--popup-max-height': `${clampedPosition.value.maxHeight}px`
   };
 });
 
 const caretStyle = computed(() => {
-  const rotDeg = isBottom.value ? '225deg' : '45deg';
+  const rotDeg = clampedPosition.value.isBottom ? '225deg' : '45deg';
   return {
     transform: `translateX(calc(-50% + ${clampedPosition.value.caretOffset}px)) rotate(${rotDeg})`
   };
@@ -164,14 +164,16 @@ const caretStyle = computed(() => {
 }
 
 .popup-card {
-  width: 310px;
+  width: 100%;
   background: linear-gradient(135deg, rgba(11, 18, 30, 0.94) 0%, rgba(15, 23, 42, 0.90) 100%);
   border: 1px solid rgba(0, 240, 255, 0.35);
   border-radius: 12px;
   padding: 14px 16px;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65), inset 0 0 16px rgba(0, 240, 255, 0.06);
-  max-height: calc(100vh - 140px);
+  max-height: var(--popup-max-height);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -227,7 +229,9 @@ const caretStyle = computed(() => {
   font-size: 18px;
   line-height: 1;
   padding: 2px 5px;
+  border: 0;
   border-radius: 4px;
+  background: transparent;
   transition: all 0.15s;
 }
 .popup-close:hover {

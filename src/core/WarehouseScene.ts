@@ -1,18 +1,17 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { EntityKey } from '../types/warehouse';
+import type { AgvFleet, AgvStatus, EntityKey, EntitySelection } from '../types/warehouse';
+import { AGV_LAPS_PER_SECOND, getAgvFrame } from './agvSimulation';
 
-export interface PickCallback {
-  (entityKey: EntityKey, anchorWorldPos: [number, number, number], isMoving: boolean): void;
-}
-
-export interface AgvItem {
+interface AgvItem extends AgvStatus {
   node: THREE.Object3D;
   offset: number;
   cargoMesh: THREE.Mesh;
-  hasCargo: boolean;
+  beltMesh: THREE.Mesh;
 }
+
+const AGV_COUNT = 7;
 
 export class WarehouseScene {
   private container: HTMLElement;
@@ -32,7 +31,6 @@ export class WarehouseScene {
   private cyberParticles: THREE.Points | null = null;
   private particleInitialY: Float32Array | null = null;
   private particlePhases: Float32Array | null = null;
-  private conveyorCargoList: { mesh: THREE.Mesh; offset: number }[] = [];
   private warehouseModel: THREE.Group | null = null;
   private movingRoadTruck: THREE.Object3D | null = null;
   private exteriorGroundMesh: THREE.Mesh | null = null;
@@ -66,23 +64,29 @@ export class WarehouseScene {
   private agvRoute: ReturnType<WarehouseScene['initAgvRoute']>;
 
   private currentTrackedObject: THREE.Object3D | null = null;
+  private hasTrackedAnchor = false;
   private clickedAnchorWorldPos = new THREE.Vector3();
   private tempProjVec = new THREE.Vector3();
 
   private clock = new THREE.Clock();
+  private lifecycle = new AbortController();
+  private destroyed = false;
   private accumulatedTime = 0;
   private isAnimationPaused = false;
   private reqAnimationId = 0;
-  private onPickCallback: PickCallback | null = null;
+  private onPickCallback: ((selection: EntitySelection) => void) | null = null;
+  private onFleetUpdateCallback: ((fleet: AgvFleet) => void) | null = null;
+  private onManualViewCallback: (() => void) | null = null;
   private onBlankClickCallback: (() => void) | null = null;
   private onPositionUpdateCallback: ((x: number, y: number, behind: boolean) => void) | null = null;
 
-  private downPos = { x: 0, y: 0 };
+  private downPos: { pointerId: number; x: number; y: number } | null = null;
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
 
   constructor(container: HTMLElement) {
     this.container = container;
+    this.animate = this.animate.bind(this);
 
     // 1. 场景
     this.scene = new THREE.Scene();
@@ -114,7 +118,6 @@ export class WarehouseScene {
     this.controls.minDistance = 14;
     this.controls.maxDistance = 130;
     this.controls.target.copy(this.defaultTarget);
-    this.controls.enableZoom = false; // 禁用 OrbitControls 原生变倍，由 3D 相机 Dolly 驱动
 
     // 5. 初始化光照与地面微表面法线贴图
     this.epoxyNormalMap = this.generateEpoxyNormalMap();
@@ -125,9 +128,6 @@ export class WarehouseScene {
     // 6. 初始化 AGV 巡线导引路线
     this.agvRoute = this.initAgvRoute();
 
-    // 7. 初始化传送带动态纸箱
-    this.initConveyorCargo();
-
     // 7.1 初始化悬浮赛博微光粒子
     this.initCyberParticles();
 
@@ -135,8 +135,7 @@ export class WarehouseScene {
     this.bindEvents();
 
     // 9. 启动动画主循环
-    this.animate = this.animate.bind(this);
-    this.animate();
+    this.requestRender();
   }
 
   private initLights() {
@@ -608,372 +607,367 @@ export class WarehouseScene {
     return { path, unloadProgress: unloadDistance / path.getLength() };
   }
 
-  private initConveyorCargo() {
-    const cBoxGeo = new THREE.BoxGeometry(0.55, 0.38, 0.55);
-    const cBoxMatKraft = new THREE.MeshStandardMaterial({ color: 0xb58958, roughness: 0.75 });
-    const cBoxMatWhite = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.35 });
-    for (let i = 0; i < 4; i++) {
-      const bMat = i % 2 === 0 ? cBoxMatKraft : cBoxMatWhite;
-      const cBox = new THREE.Mesh(cBoxGeo, bMat);
-      cBox.castShadow = true;
-      cBox.receiveShadow = true;
-      cBox.userData = { entityKey: 'conveyor_dock1' as EntityKey };
-      this.scene.add(cBox);
-      this.interactiveMeshes.push(cBox);
-      this.conveyorCargoList.push({ mesh: cBox, offset: i / 4.0 });
+  public async loadModel(onProgress: (percent: number) => void): Promise<void> {
+    const signal = this.lifecycle.signal;
+    const timeout = window.setTimeout(() => this.lifecycle.abort(), 30_000);
+    try {
+      onProgress(15);
+      const response = await fetch('/smart_warehouse.glb?v=2.3.0', { signal });
+      if (!response.ok) throw new Error(`GLB request failed (${response.status})`);
+
+      const data = await response.arrayBuffer();
+      onProgress(75);
+      const gltf = await new GLTFLoader().parseAsync(data, '/');
+      if (signal.aborted) {
+        this.disposeResources(gltf.scene);
+        throw new Error('GLB loading was canceled or timed out');
+      }
+
+      this.attachWarehouse(gltf.scene);
+      this.updateSimulation(true);
+      this.clock.getDelta();
+      this.requestRender();
+      onProgress(100);
+    } finally {
+      window.clearTimeout(timeout);
     }
   }
 
-  public loadModel(onProgress?: (percent: number, items: number) => void): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const gltfLoader = new GLTFLoader();
-      const modelUrl = '/smart_warehouse.glb?v=2.3.0';
+  private attachWarehouse(model: THREE.Group) {
+    this.warehouseModel = model;
+    this.scene.add(this.warehouseModel);
 
-      gltfLoader.load(
-        modelUrl,
-        (gltf) => {
-          this.warehouseModel = gltf.scene;
-          this.scene.add(this.warehouseModel);
+    this.warehouseModel.traverse((child) => {
+      if ((child as any).isLight) {
+        (child as any).intensity = 0;
+        return;
+      }
 
-          this.warehouseModel.traverse((child) => {
-            if ((child as any).isLight) {
-              (child as any).intensity = 0;
-              return;
-            }
+      if ((child as THREE.Mesh).isMesh) {
+        const n = child.name;
 
-            if ((child as THREE.Mesh).isMesh) {
-              const n = child.name;
-
-              // 1. 浅蓝通透高保真钢化玻璃幕墙与双面透光 (光学级透射)
-              if (n.startsWith('Glass_')) {
-                child.castShadow = false;
-                child.receiveShadow = false;
-                this.glassWallMeshes.push(child as THREE.Mesh);
-                (child as THREE.Mesh).material = new THREE.MeshPhysicalMaterial({
-                  color: 0xcbe6ff,
-                  transparent: true,
-                  opacity: 1.0,
-                  roughness: 0.05,
-                  metalness: 0.02,
-                  transmission: 0.92,
-                  ior: 1.52,
-                  thickness: 0.5,
-                  reflectivity: 0.65,
-                  clearcoat: 0.85,
-                  clearcoatRoughness: 0.04,
-                  depthWrite: false,
-                  side: THREE.DoubleSide
-                });
-              } else if (n.startsWith('Mullion_')) {
-                // 1.1 玻璃幕墙深色高刚性金属立柱与横梁骨架
-                this.mullionMeshes.push(child as THREE.Mesh);
-                child.castShadow = true;
-                child.receiveShadow = true;
-              } else if (n.startsWith('AGV_Trajectory_Laser_Line') || n.startsWith('AGV_Track_Base_Band')) {
-                // 隐藏模型内的旧导轨，地面导引线和车辆统一使用运行时路线。
-                child.visible = false;
-                return;
-              } else if (n.startsWith('AGV_Waypoint_')) {
-                // 2.2 AGV 导航地标与工位圆环
-                child.castShadow = false;
-                child.receiveShadow = false;
-                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-                  color: 0x00f3ff,
-                  side: THREE.DoubleSide
-                });
-              } else if (n.startsWith('Cargo_Line_')) {
-                // 2.3 货物存储区/托盘定置区工业 5S 琥珀黄色标线 (与 AGV 行驶轨迹清晰区分)
-                child.castShadow = false;
-                child.receiveShadow = false;
-                child.renderOrder = 4;
-                child.position.y += 0.015; // 抬高15mm杜绝与地面共面 Z-fighting
-                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-                  color: 0xf59e0b,
-                  polygonOffset: true,
-                  polygonOffsetFactor: -3,
-                  polygonOffsetUnits: -3,
-                  depthTest: true
-                });
-                this.cargoLineMeshes.push(child as THREE.Mesh);
-              } else if (n === 'Warehouse_Floor') {
-                // 3. 高反光地坪 (由 setTheme 根据当前模式统一着色与高光设定)
-                this.warehouseFloorMesh = child as THREE.Mesh;
-                child.castShadow = false;
-                child.receiveShadow = true;
-              } else if (n === 'Exterior_Ground') {
-                this.exteriorGroundMesh = child as THREE.Mesh;
-                child.castShadow = false;
-                child.receiveShadow = true;
-              } else if (n === 'Truck_Road_East') {
-                this.truckRoadMesh = child as THREE.Mesh;
-                child.castShadow = false;
-                child.receiveShadow = true;
-              } else if (n === 'Road_Stripes_Unified') {
-                this.roadStripesMesh = child as THREE.Mesh;
-                child.castShadow = false;
-                child.receiveShadow = false;
-                child.renderOrder = 5;
-              } else if (n === 'Holo_Screen_Panel') {
-                // 隐藏原 GLB 内部被完全包裹遮挡的旧模型面板
-                child.visible = false;
-              } else if (n === 'Holo_Screen_Border') {
-                // 4.1 全息大屏钛合金外框底壳与后背板
-                this.holoScreenBorderMesh = child as THREE.Mesh;
-                child.castShadow = true;
-                child.receiveShadow = true;
-                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                  color: 0x162232,
-                  roughness: 0.28,
-                  metalness: 0.75
-                });
-              } else if (n.startsWith('Holo_Stand_')) {
-                // 4.2 全息大屏金属落地支撑脚架
-                this.holoStandMeshes.push(child as THREE.Mesh);
-                child.castShadow = true;
-                child.receiveShadow = true;
-                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                  color: 0x5a6d85,
-                  roughness: 0.25,
-                  metalness: 0.85
-                });
-              } else if (n.endsWith('_Glass')) {
-                child.castShadow = false;
-                child.receiveShadow = false;
-                child.renderOrder = 10;
-              } else {
-                child.castShadow = true;
-                child.receiveShadow = true;
-              }
-
-              // 5. 补齐重型卡车 PBR 清漆车漆、透明车窗玻璃与金属件分级管线
-              const meshObj = child as THREE.Mesh;
-              if (meshObj.material) {
-                const matList = Array.isArray(meshObj.material) ? meshObj.material : [meshObj.material];
-                matList.forEach((m, idx) => {
-                  if (!m) return;
-                  if (m.name === 'Mat_Truck_Cab') {
-                    const carPaint = new THREE.MeshPhysicalMaterial({
-                      color: this.currentTheme === 'cyber' ? 0x1e6bb8 : 0x2563eb,
-                      metalness: 0.38,
-                      roughness: 0.20,
-                      clearcoat: 1.0,
-                      clearcoatRoughness: 0.04
-                    });
-                    this.truckCabMaterials.push(carPaint);
-                    if (Array.isArray(meshObj.material)) {
-                      (meshObj.material as THREE.Material[])[idx] = carPaint;
-                    } else {
-                      meshObj.material = carPaint;
-                    }
-                  } else if (m.name === 'Mat_Glass_Cyan') {
-                    // 高透汽车级透明物理玻璃：光线直透座舱内部方向盘、座椅与发光屏，表面叠加镜面清漆高光
-                    const truckGlass = new THREE.MeshPhysicalMaterial({
-                      color: 0xe0f2fe,
-                      transparent: true,
-                      opacity: 0.20,
-                      roughness: 0.03,
-                      metalness: 0.05,
-                      clearcoat: 1.0,
-                      clearcoatRoughness: 0.03,
-                      depthWrite: false,
-                      side: THREE.DoubleSide
-                    });
-                    meshObj.castShadow = false;
-                    meshObj.receiveShadow = false;
-                    meshObj.renderOrder = 10;
-                    if (Array.isArray(meshObj.material)) {
-                      (meshObj.material as THREE.Material[])[idx] = truckGlass;
-                    } else {
-                      meshObj.material = truckGlass;
-                    }
-                  } else if (m.name === 'Mat_Screen_Glow') {
-                    // 自发光天青色液晶屏与前大灯/雾灯：BasicMaterial 无阴影接收，配合 polygonOffset 彻底杜绝共面与自阴影闪烁
-                    const ledLight = new THREE.MeshBasicMaterial({
-                      color: 0x67e8f9,
-                      polygonOffset: true,
-                      polygonOffsetFactor: -3,
-                      polygonOffsetUnits: -3,
-                      toneMapped: false
-                    });
-                    if (Array.isArray(meshObj.material)) {
-                      (meshObj.material as THREE.Material[])[idx] = ledLight;
-                    } else {
-                      meshObj.material = ledLight;
-                    }
-                  } else if (m.name === 'Mat_TailLight_Glow') {
-                    // 真实工业高亮红宝石尾灯
-                    const redLed = new THREE.MeshBasicMaterial({
-                      color: 0xf43f5e,
-                      polygonOffset: true,
-                      polygonOffsetFactor: -3,
-                      polygonOffsetUnits: -3,
-                      toneMapped: false
-                    });
-                    if (Array.isArray(meshObj.material)) {
-                      (meshObj.material as THREE.Material[])[idx] = redLed;
-                    } else {
-                      meshObj.material = redLed;
-                    }
-                  } else if (m.name === 'Mat_Marker_Glow') {
-                    // 车顶与货厢侧面琥珀黄安全示宽小灯
-                    const amberLed = new THREE.MeshBasicMaterial({
-                      color: 0xfbbf24,
-                      polygonOffset: true,
-                      polygonOffsetFactor: -3,
-                      polygonOffsetUnits: -3,
-                      toneMapped: false
-                    });
-                    if (Array.isArray(meshObj.material)) {
-                      (meshObj.material as THREE.Material[])[idx] = amberLed;
-                    } else {
-                      meshObj.material = amberLed;
-                    }
-                  } else if (m.name === 'Mat_Seat_Fabric') {
-                    if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                      const std = m as THREE.MeshStandardMaterial;
-                      std.color.setHex(0x334155);
-                      std.metalness = 0.08;
-                      std.roughness = 0.65;
-                    }
-                  } else if (m.name === 'Mat_Dashboard') {
-                    if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                      const std = m as THREE.MeshStandardMaterial;
-                      std.color.setHex(0x1e293b);
-                      std.metalness = 0.05;
-                      std.roughness = 0.70;
-                    }
-                  } else if (m.name === 'Mat_Truck_Box') {
-                    if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                      const std = m as THREE.MeshStandardMaterial;
-                      std.metalness = 0.08;
-                      std.roughness = 0.32;
-                    }
-                  } else if (m.name === 'Mat_Steel_Frame') {
-                    if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                      const std = m as THREE.MeshStandardMaterial;
-                      std.metalness = 0.90;
-                      std.roughness = 0.24;
-                    }
-                  } else if (m.name === 'Mat_Conveyor_Metal') {
-                    if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                      const std = m as THREE.MeshStandardMaterial;
-                      std.metalness = 0.96;
-                      std.roughness = 0.14;
-                    }
-                  } else if (m.name === 'Mat_Dark_Trim') {
-                    if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                      const std = m as THREE.MeshStandardMaterial;
-                      std.metalness = 0.02;
-                      std.roughness = 0.85;
-                    }
-                  }
-                });
-              }
-
-              let matchedKey: EntityKey | null = null;
-
-              if (n.includes('Workstation') || n.startsWith('WS_') || n.includes('Robot_')) {
-                matchedKey = 'pc_workstation';
-              } else if (n.includes('Conveyor') || n.includes('Sort_Table')) {
-                matchedKey = 'conveyor_dock1';
-              } else if (n.includes('Cold_') || n.includes('Snowflake')) {
-                matchedKey = 'cold_storage';
-              } else if (n.includes('Pallet_South')) {
-                matchedKey = 'pallet_south';
-              } else if (n.includes('Pallet_East') || n.includes('Pallet_North') || n.includes('Pallet_West')) {
-                matchedKey = 'pallet_east';
-              } else if (n.includes('Truck_Stationary_Dock1')) {
-                matchedKey = 'truck_dock1';
-              } else if (n.includes('Truck_Stationary_Dock2')) {
-                matchedKey = 'truck_dock2';
-              } else if (n.includes('Truck_Stationary_Dock3') || n.includes('Truck_Moving_Road')) {
-                matchedKey = 'outbound_truck';
-              } else if (n.includes('AGV_')) {
-                matchedKey = 'agv_robot';
-              }
-
-              if (matchedKey) {
-                child.userData.entityKey = matchedKey;
-                this.interactiveMeshes.push(child);
-              }
-            }
-          });
-
-          // 提取 6 台六轴工业机械臂关节，用于平滑拣选点动动画
-          for (let i = 1; i <= 6; i++) {
-            const prefix = `Workstation_Robot_${i < 10 ? '0' + i : i}`;
-            const tt = this.warehouseModel.getObjectByName(`${prefix}_Turntable`);
-            const wrist = this.warehouseModel.getObjectByName(`${prefix}_Wrist`);
-            if (tt && wrist) {
-              this.robotArmNodes.push({ turntable: tt, wrist: wrist, phase: i * 1.15 });
-            }
-          }
-
-          // 提取 7 台 AGV 机器人并挂载动态接驳货箱 (支持牛皮纸箱与白膜包装箱动态移载)
-          const agvBoxGeo = new THREE.BoxGeometry(0.52, 0.32, 0.42);
-          for (let i = 1; i <= 7; i++) {
-            const agvName = `AGV_Robot_${i < 10 ? '0' + i : i}`;
-            const node = this.warehouseModel.getObjectByName(agvName);
-            if (node) {
-              const cargoMesh = new THREE.Mesh(agvBoxGeo, i % 2 === 1 ? this.agvKraftMat : this.agvWhiteMat);
-              cargoMesh.position.set(0, 0.30, 0); // 端正贴合在 AGV 承载平台上表面
-              cargoMesh.castShadow = true;
-              cargoMesh.receiveShadow = true;
-              cargoMesh.userData.entityKey = 'agv_robot';
-              cargoMesh.visible = false; // 由动画状态机依据当前所处工位动态控制显隐
-              node.add(cargoMesh);
-              this.interactiveMeshes.push(cargoMesh);
-
-              this.agvRobots.push({
-                node: node,
-                offset: (i - 1) / 7.0,
-                cargoMesh: cargoMesh,
-                hasCargo: false
-              });
-            }
-          }
-
-          // 提取公路巡航重卡
-          this.movingRoadTruck = this.warehouseModel.getObjectByName('Truck_Moving_Road') || null;
-          if (this.movingRoadTruck) {
-            this.movingRoadTruck.userData.entityKey = 'outbound_truck';
-            this.interactiveMeshes.push(this.movingRoadTruck);
-          }
-
-          // 4.3 构建居于大屏边框前表面的超清自发光全息管控大屏 (不受内部死黑模型包裹)
-          if (!this.holoScreenTexture) {
-            this.holoScreenTexture = this.createHoloScreenTexture();
-          }
-          const screenGeo = new THREE.PlaneGeometry(4.25, 2.42);
-          const screenMat = new THREE.MeshBasicMaterial({
-            map: this.holoScreenTexture,
+        // 1. 浅蓝通透高保真钢化玻璃幕墙与双面透光 (光学级透射)
+        if (n.startsWith('Glass_')) {
+          child.castShadow = false;
+          child.receiveShadow = false;
+          this.glassWallMeshes.push(child as THREE.Mesh);
+          (child as THREE.Mesh).material = new THREE.MeshPhysicalMaterial({
+            color: 0xcbe6ff,
+            transparent: true,
+            opacity: 1.0,
+            roughness: 0.05,
+            metalness: 0.02,
+            transmission: 0.92,
+            ior: 1.52,
+            thickness: 0.5,
+            reflectivity: 0.65,
+            clearcoat: 0.85,
+            clearcoatRoughness: 0.04,
+            depthWrite: false,
             side: THREE.DoubleSide
           });
-          this.holoScreenPanelMesh = new THREE.Mesh(screenGeo, screenMat);
-          this.holoScreenPanelMesh.position.set(4.48, 1.80, -7.12);
-          this.holoScreenPanelMesh.rotation.y = -0.2366;
-          this.holoScreenPanelMesh.renderOrder = 3;
-          this.scene.add(this.holoScreenPanelMesh);
-
-          this.setTheme(this.currentTheme);
-
-          if (onProgress) onProgress(100, 109);
-          resolve();
-        },
-        (xhr) => {
-          if (xhr.lengthComputable && xhr.total > 0 && onProgress) {
-            const ratio = xhr.loaded / xhr.total;
-            const percent = Math.min(99, Math.floor(ratio * 75 + 20));
-            const items = Math.floor((percent / 100) * 109);
-            onProgress(percent, items);
-          }
-        },
-        (err) => {
-          console.error('加载 GLB 失败:', err);
-          reject(err);
+        } else if (n.startsWith('Mullion_')) {
+          // 1.1 玻璃幕墙深色高刚性金属立柱与横梁骨架
+          this.mullionMeshes.push(child as THREE.Mesh);
+          child.castShadow = true;
+          child.receiveShadow = true;
+        } else if (n.startsWith('AGV_Trajectory_Laser_Line') || n.startsWith('AGV_Track_Base_Band')) {
+          // 隐藏模型内的旧导轨，地面导引线和车辆统一使用运行时路线。
+          child.visible = false;
+          return;
+        } else if (n.startsWith('AGV_Waypoint_')) {
+          // 2.2 AGV 导航地标与工位圆环
+          child.castShadow = false;
+          child.receiveShadow = false;
+          (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
+            color: 0x00f3ff,
+            side: THREE.DoubleSide
+          });
+        } else if (n.startsWith('Cargo_Line_')) {
+          // 2.3 货物存储区/托盘定置区工业 5S 琥珀黄色标线 (与 AGV 行驶轨迹清晰区分)
+          child.castShadow = false;
+          child.receiveShadow = false;
+          child.renderOrder = 4;
+          child.position.y += 0.015; // 抬高15mm杜绝与地面共面 Z-fighting
+          (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
+            color: 0xf59e0b,
+            polygonOffset: true,
+            polygonOffsetFactor: -3,
+            polygonOffsetUnits: -3,
+            depthTest: true
+          });
+          this.cargoLineMeshes.push(child as THREE.Mesh);
+        } else if (n === 'Warehouse_Floor') {
+          // 3. 高反光地坪 (由 setTheme 根据当前模式统一着色与高光设定)
+          this.warehouseFloorMesh = child as THREE.Mesh;
+          child.castShadow = false;
+          child.receiveShadow = true;
+        } else if (n === 'Exterior_Ground') {
+          this.exteriorGroundMesh = child as THREE.Mesh;
+          child.castShadow = false;
+          child.receiveShadow = true;
+        } else if (n === 'Truck_Road_East') {
+          this.truckRoadMesh = child as THREE.Mesh;
+          child.castShadow = false;
+          child.receiveShadow = true;
+        } else if (n === 'Road_Stripes_Unified') {
+          this.roadStripesMesh = child as THREE.Mesh;
+          child.castShadow = false;
+          child.receiveShadow = false;
+          child.renderOrder = 5;
+        } else if (n === 'Holo_Screen_Panel') {
+          // 隐藏原 GLB 内部被完全包裹遮挡的旧模型面板
+          child.visible = false;
+        } else if (n === 'Holo_Screen_Border') {
+          // 4.1 全息大屏钛合金外框底壳与后背板
+          this.holoScreenBorderMesh = child as THREE.Mesh;
+          child.castShadow = true;
+          child.receiveShadow = true;
+          (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+            color: 0x162232,
+            roughness: 0.28,
+            metalness: 0.75
+          });
+        } else if (n.startsWith('Holo_Stand_')) {
+          // 4.2 全息大屏金属落地支撑脚架
+          this.holoStandMeshes.push(child as THREE.Mesh);
+          child.castShadow = true;
+          child.receiveShadow = true;
+          (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+            color: 0x5a6d85,
+            roughness: 0.25,
+            metalness: 0.85
+          });
+        } else if (n.endsWith('_Glass')) {
+          child.castShadow = false;
+          child.receiveShadow = false;
+          child.renderOrder = 10;
+        } else {
+          child.castShadow = true;
+          child.receiveShadow = true;
         }
-      );
+
+        // 5. 补齐重型卡车 PBR 清漆车漆、透明车窗玻璃与金属件分级管线
+        const meshObj = child as THREE.Mesh;
+        if (meshObj.material) {
+          const matList = Array.isArray(meshObj.material) ? meshObj.material : [meshObj.material];
+          matList.forEach((m, idx) => {
+            if (!m) return;
+            if (m.name === 'Mat_Truck_Cab') {
+              const carPaint = new THREE.MeshPhysicalMaterial({
+                color: this.currentTheme === 'cyber' ? 0x1e6bb8 : 0x2563eb,
+                metalness: 0.38,
+                roughness: 0.20,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.04
+              });
+              this.truckCabMaterials.push(carPaint);
+              if (Array.isArray(meshObj.material)) {
+                (meshObj.material as THREE.Material[])[idx] = carPaint;
+              } else {
+                meshObj.material = carPaint;
+              }
+            } else if (m.name === 'Mat_Glass_Cyan') {
+              // 高透汽车级透明物理玻璃：光线直透座舱内部方向盘、座椅与发光屏，表面叠加镜面清漆高光
+              const truckGlass = new THREE.MeshPhysicalMaterial({
+                color: 0xe0f2fe,
+                transparent: true,
+                opacity: 0.20,
+                roughness: 0.03,
+                metalness: 0.05,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.03,
+                depthWrite: false,
+                side: THREE.DoubleSide
+              });
+              meshObj.castShadow = false;
+              meshObj.receiveShadow = false;
+              meshObj.renderOrder = 10;
+              if (Array.isArray(meshObj.material)) {
+                (meshObj.material as THREE.Material[])[idx] = truckGlass;
+              } else {
+                meshObj.material = truckGlass;
+              }
+            } else if (m.name === 'Mat_Screen_Glow') {
+              // 自发光天青色液晶屏与前大灯/雾灯：BasicMaterial 无阴影接收，配合 polygonOffset 彻底杜绝共面与自阴影闪烁
+              const ledLight = new THREE.MeshBasicMaterial({
+                color: 0x67e8f9,
+                polygonOffset: true,
+                polygonOffsetFactor: -3,
+                polygonOffsetUnits: -3,
+                toneMapped: false
+              });
+              if (Array.isArray(meshObj.material)) {
+                (meshObj.material as THREE.Material[])[idx] = ledLight;
+              } else {
+                meshObj.material = ledLight;
+              }
+            } else if (m.name === 'Mat_TailLight_Glow') {
+              // 真实工业高亮红宝石尾灯
+              const redLed = new THREE.MeshBasicMaterial({
+                color: 0xf43f5e,
+                polygonOffset: true,
+                polygonOffsetFactor: -3,
+                polygonOffsetUnits: -3,
+                toneMapped: false
+              });
+              if (Array.isArray(meshObj.material)) {
+                (meshObj.material as THREE.Material[])[idx] = redLed;
+              } else {
+                meshObj.material = redLed;
+              }
+            } else if (m.name === 'Mat_Marker_Glow') {
+              // 车顶与货厢侧面琥珀黄安全示宽小灯
+              const amberLed = new THREE.MeshBasicMaterial({
+                color: 0xfbbf24,
+                polygonOffset: true,
+                polygonOffsetFactor: -3,
+                polygonOffsetUnits: -3,
+                toneMapped: false
+              });
+              if (Array.isArray(meshObj.material)) {
+                (meshObj.material as THREE.Material[])[idx] = amberLed;
+              } else {
+                meshObj.material = amberLed;
+              }
+            } else if (m.name === 'Mat_Seat_Fabric') {
+              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+                const std = m as THREE.MeshStandardMaterial;
+                std.color.setHex(0x334155);
+                std.metalness = 0.08;
+                std.roughness = 0.65;
+              }
+            } else if (m.name === 'Mat_Dashboard') {
+              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+                const std = m as THREE.MeshStandardMaterial;
+                std.color.setHex(0x1e293b);
+                std.metalness = 0.05;
+                std.roughness = 0.70;
+              }
+            } else if (m.name === 'Mat_Truck_Box') {
+              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+                const std = m as THREE.MeshStandardMaterial;
+                std.metalness = 0.08;
+                std.roughness = 0.32;
+              }
+            } else if (m.name === 'Mat_Steel_Frame') {
+              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+                const std = m as THREE.MeshStandardMaterial;
+                std.metalness = 0.90;
+                std.roughness = 0.24;
+              }
+            } else if (m.name === 'Mat_Conveyor_Metal') {
+              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+                const std = m as THREE.MeshStandardMaterial;
+                std.metalness = 0.96;
+                std.roughness = 0.14;
+              }
+            } else if (m.name === 'Mat_Dark_Trim') {
+              if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+                const std = m as THREE.MeshStandardMaterial;
+                std.metalness = 0.02;
+                std.roughness = 0.85;
+              }
+            }
+          });
+        }
+
+        // 工位圆环仅用于导引，车辆由各自的 GLB 根节点统一登记。
+        if (n.startsWith('AGV_')) return;
+
+        let matchedKey: EntityKey | null = null;
+
+        if (n.includes('Workstation') || n.startsWith('WS_') || n.includes('Robot_')) {
+          matchedKey = 'pc_workstation';
+        } else if (n.includes('Conveyor') || n.includes('Sort_Table')) {
+          matchedKey = 'conveyor_dock1';
+        } else if (n.includes('Cold_') || n.includes('Snowflake')) {
+          matchedKey = 'cold_storage';
+        } else if (n.includes('Pallet_South')) {
+          matchedKey = 'pallet_south';
+        } else if (n.includes('Pallet_East') || n.includes('Pallet_North') || n.includes('Pallet_West')) {
+          matchedKey = 'pallet_east';
+        } else if (n.includes('Truck_Stationary_Dock1')) {
+          matchedKey = 'truck_dock1';
+        } else if (n.includes('Truck_Stationary_Dock2')) {
+          matchedKey = 'truck_dock2';
+        } else if (n.includes('Truck_Stationary_Dock3') || n.includes('Truck_Moving_Road')) {
+          matchedKey = 'outbound_truck';
+        }
+
+        if (matchedKey) {
+          child.userData.entityKey = matchedKey;
+          this.interactiveMeshes.push(child);
+        }
+      }
     });
+
+    // 提取 6 台六轴工业机械臂关节，用于平滑拣选点动动画
+    for (let i = 1; i <= 6; i++) {
+      const prefix = `Workstation_Robot_${i < 10 ? '0' + i : i}`;
+      const tt = this.warehouseModel.getObjectByName(`${prefix}_Turntable`);
+      const wrist = this.warehouseModel.getObjectByName(`${prefix}_Wrist`);
+      if (tt && wrist) {
+        this.robotArmNodes.push({ turntable: tt, wrist: wrist, phase: i * 1.15 });
+      }
+    }
+
+    // 每台车配对登记一只车载箱和一只传送带箱，供同一次到站交替显示。
+    const agvBoxGeo = new THREE.BoxGeometry(0.52, 0.32, 0.42);
+    for (let id = 1; id <= AGV_COUNT; id++) {
+      const agvName = `AGV_Robot_${String(id).padStart(2, '0')}`;
+      const node = this.warehouseModel.getObjectByName(agvName);
+      if (!node) continue;
+
+      const cargoMesh = new THREE.Mesh(agvBoxGeo, this.agvKraftMat);
+      cargoMesh.position.y = 0.30;
+      cargoMesh.castShadow = true;
+      cargoMesh.receiveShadow = true;
+      node.add(cargoMesh);
+      Object.assign(node.userData, { entityKey: 'agv_robot', agvId: id, moves: true });
+
+      const beltMesh = new THREE.Mesh(agvBoxGeo, this.agvWhiteMat);
+      beltMesh.castShadow = true;
+      beltMesh.receiveShadow = true;
+      beltMesh.userData = { entityKey: 'conveyor_dock1', moves: true };
+      this.scene.add(beltMesh);
+      this.interactiveMeshes.push(node, beltMesh);
+
+      this.agvRobots.push({
+        id,
+        node,
+        offset: (id - 1) / AGV_COUNT,
+        cargoMesh,
+        beltMesh,
+        phase: 'returning',
+        hasCargo: false
+      });
+    }
+
+    // 提取公路巡航重卡
+    this.movingRoadTruck = this.warehouseModel.getObjectByName('Truck_Moving_Road') || null;
+    if (this.movingRoadTruck) {
+      this.movingRoadTruck.userData.entityKey = 'outbound_truck';
+      this.movingRoadTruck.userData.moves = true;
+      this.interactiveMeshes.push(this.movingRoadTruck);
+    }
+
+    // 4.3 构建居于大屏边框前表面的超清自发光全息管控大屏 (不受内部死黑模型包裹)
+    if (!this.holoScreenTexture) {
+      this.holoScreenTexture = this.createHoloScreenTexture();
+    }
+    const screenGeo = new THREE.PlaneGeometry(4.25, 2.42);
+    const screenMat = new THREE.MeshBasicMaterial({
+      map: this.holoScreenTexture,
+      side: THREE.DoubleSide
+    });
+    this.holoScreenPanelMesh = new THREE.Mesh(screenGeo, screenMat);
+    this.holoScreenPanelMesh.position.set(4.48, 1.80, -7.12);
+    this.holoScreenPanelMesh.rotation.y = -0.2366;
+    this.holoScreenPanelMesh.renderOrder = 3;
+    this.scene.add(this.holoScreenPanelMesh);
+
+    this.setTheme(this.currentTheme);
   }
 
   // 3D 相机 Dolly 缩放 (不触动任何 DOM/页面)
@@ -986,7 +980,7 @@ export class WarehouseScene {
     offset.setLength(dist);
     this.camera.position.copy(this.controls.target).add(offset);
     this.controls.update();
-    this.triggerPopupUpdate();
+    this.requestRender();
   }
 
   public resetCameraView() {
@@ -1021,9 +1015,10 @@ export class WarehouseScene {
     this.camTransitionDuration = duration;
     this.camTransitionStartTime = performance.now();
     this.isTransitioningCamera = true;
+    this.requestRender();
   }
 
-  public focusOnEntity(key: EntityKey, anchorPos: [number, number, number], _isMoving: boolean = false) {
+  public focusOnEntity(key: EntityKey, anchorPos: [number, number, number]) {
     const target = new THREE.Vector3(anchorPos[0], Math.max(0.4, anchorPos[1] - 0.4), anchorPos[2]);
     const camOffset = new THREE.Vector3(-4.5, 4.0, 5.0);
 
@@ -1066,28 +1061,27 @@ export class WarehouseScene {
   }
 
   public selectEntityByKey(key: EntityKey) {
-    const targetObj = this.interactiveMeshes.find((m) => m.userData.entityKey === key);
+    const targetObj = this.interactiveMeshes.find((m) => m.visible && m.userData.entityKey === key);
     if (targetObj) {
       const box = new THREE.Box3().setFromObject(targetObj);
       const center = new THREE.Vector3();
       box.getCenter(center);
       const anchorPos: [number, number, number] = [center.x, box.max.y + 0.35, center.z];
-      this.setTrackedAnchor(anchorPos, targetObj);
-      this.focusOnEntity(key, anchorPos, false);
-      if (this.onPickCallback) {
-        this.onPickCallback(key, anchorPos, false);
-      }
+      this.pickEntity(targetObj, anchorPos);
     }
   }
 
-  public toggleAnimation(): boolean {
-    this.isAnimationPaused = !this.isAnimationPaused;
-    return this.isAnimationPaused;
+  public setAnimationPaused(paused: boolean) {
+    if (paused === this.isAnimationPaused) return;
+    this.isAnimationPaused = paused;
+    this.clock.getDelta();
+    this.requestRender();
   }
 
   public setCyberParticlesVisible(visible: boolean) {
     if (this.cyberParticles) {
       this.cyberParticles.visible = visible && this.currentTheme === 'cyber';
+      this.requestRender();
     }
   }
 
@@ -1323,6 +1317,7 @@ export class WarehouseScene {
         });
       }
     }
+    this.requestRender();
   }
 
   public toggleTheme(): 'studio' | 'cyber' {
@@ -1331,18 +1326,31 @@ export class WarehouseScene {
     return next;
   }
 
-  public setTrackedAnchor(anchorPos: [number, number, number], targetMesh: THREE.Object3D | null = null) {
-    this.currentTrackedObject = targetMesh;
-    this.clickedAnchorWorldPos.set(anchorPos[0], anchorPos[1], anchorPos[2]);
+  private pickEntity(object: THREE.Object3D, anchor: [number, number, number]) {
+    const { entityKey, agvId, moves } = object.userData;
+    this.currentTrackedObject = moves ? object : null;
+    this.hasTrackedAnchor = true;
+    this.clickedAnchorWorldPos.set(...anchor);
     this.triggerPopupUpdate();
+    this.focusOnEntity(entityKey, anchor);
+    this.onPickCallback?.({ key: entityKey, agvId });
   }
 
   public clearTrackedAnchor() {
     this.currentTrackedObject = null;
+    this.hasTrackedAnchor = false;
   }
 
-  public onPick(callback: PickCallback) {
+  public onPick(callback: (selection: EntitySelection) => void) {
     this.onPickCallback = callback;
+  }
+
+  public onFleetUpdate(callback: (fleet: AgvFleet) => void) {
+    this.onFleetUpdateCallback = callback;
+  }
+
+  public onManualView(callback: () => void) {
+    this.onManualViewCallback = callback;
   }
 
   public onBlankClick(callback: () => void) {
@@ -1354,9 +1362,14 @@ export class WarehouseScene {
   }
 
   private triggerPopupUpdate() {
-    if (!this.onPositionUpdateCallback) return;
+    if (!this.hasTrackedAnchor || !this.onPositionUpdateCallback) return;
 
     if (this.currentTrackedObject) {
+      if (!this.currentTrackedObject.visible) {
+        this.clearTrackedAnchor();
+        this.onBlankClickCallback?.();
+        return;
+      }
       this.currentTrackedObject.getWorldPosition(this.tempProjVec);
       this.tempProjVec.y += 0.8;
     } else {
@@ -1364,139 +1377,98 @@ export class WarehouseScene {
     }
 
     this.tempProjVec.project(this.camera);
-
-    const behind = this.tempProjVec.z >= 1.0;
-    const rawX = (this.tempProjVec.x * 0.5 + 0.5) * window.innerWidth;
-    const rawY = (-(this.tempProjVec.y * 0.5) + 0.5) * window.innerHeight;
-
-    this.onPositionUpdateCallback(rawX, rawY, behind);
+    const canvas = this.renderer.domElement.getBoundingClientRect();
+    const behind = Math.abs(this.tempProjVec.x) > 1 || Math.abs(this.tempProjVec.y) > 1 ||
+      this.tempProjVec.z < -1 || this.tempProjVec.z >= 1;
+    const x = canvas.left + (this.tempProjVec.x * 0.5 + 0.5) * canvas.width;
+    const y = canvas.top + (-this.tempProjVec.y * 0.5 + 0.5) * canvas.height;
+    this.onPositionUpdateCallback(x, y, behind);
   }
 
   private bindEvents() {
-    // 滚轮与触控板手势：仅驱动 3D 相机缩放
-    window.addEventListener('wheel', (e) => {
-      const el = e.target as HTMLElement;
-      if (el && el.closest('.popup-content')) return; // 允许弹窗内文本滚动
-      e.preventDefault();
+    const canvas = this.renderer.domElement;
+    const { signal } = this.lifecycle;
 
-      const isPinch = e.ctrlKey;
-      const factor = isPinch ? 0.005 : 0.0016;
-      const zoomRatio = 1 + e.deltaY * factor;
-      this.zoomCamera(zoomRatio);
-    }, { passive: false });
-
-    // 严防 Mac Safari / Chrome 双指缩放触发 Viewport Zoom
-    document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
-    document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
-    document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
-
-    // 键盘快捷键
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '0')) {
-        e.preventDefault();
-        if (e.key === '+' || e.key === '=') this.zoomCamera(0.85);
-        if (e.key === '-') this.zoomCamera(1.18);
-        if (e.key === '0') this.resetCameraView();
-      } else if (e.key === '+' || e.key === '=') {
-        this.zoomCamera(0.85);
-      } else if (e.key === '-') {
-        this.zoomCamera(1.18);
-      } else if (e.key === 'r' || e.key === 'R') {
-        this.resetCameraView();
-      } else if (e.key === 't' || e.key === 'T') {
-        this.setTopView();
-      } else if (e.code === 'Space') {
-        this.toggleAnimation();
-      }
-    });
-
-    // 拾取交互
-    window.addEventListener('pointerdown', (e) => {
-      this.downPos.x = e.clientX;
-      this.downPos.y = e.clientY;
-      // 用户主动交互时立即中断镜头平滑动画，无缝移交手动控制权
+    this.controls.addEventListener('change', () => this.requestRender());
+    this.controls.addEventListener('start', () => {
       this.isTransitioningCamera = false;
+      this.requestRender();
     });
 
-    window.addEventListener('pointerup', (e) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.closest('.anchored-popup') ||
-        target.closest('.floating-controls-dock') ||
-        target.closest('.digital-twin-header') ||
-        target.closest('.kpi-ribbon-bar')
-      ) {
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary) {
+        this.downPos = null;
+        this.onManualViewCallback?.();
+      } else if (e.button === 0) {
+        this.downPos = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+      }
+    }, { signal });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (e.button !== 0) {
+        this.onManualViewCallback?.();
         return;
       }
-
-      const dist = Math.hypot(e.clientX - this.downPos.x, e.clientY - this.downPos.y);
-      if (dist < 6) {
-        this.pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-        this.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
-        this.raycaster.setFromCamera(this.pointer, this.camera);
-        const intersects = this.raycaster.intersectObjects(this.interactiveMeshes, true);
-
-        if (intersects.length > 0) {
-          const hit = intersects[0];
-          let obj: THREE.Object3D | null = hit.object;
-
-          while (obj && !obj.userData.entityKey && obj.parent) {
-            obj = obj.parent;
-          }
-
-          if (obj && obj.userData.entityKey) {
-            const isMoving =
-              obj.name.includes('AGV_') ||
-              obj === this.movingRoadTruck ||
-              this.conveyorCargoList.some((c) => c.mesh === hit.object);
-
-            const trackedMesh = isMoving
-              ? this.conveyorCargoList.some((c) => c.mesh === hit.object)
-                ? hit.object
-                : obj
-              : null;
-
-            const anchor = hit.point.clone().add(new THREE.Vector3(0, 0.35, 0));
-            const anchorPos: [number, number, number] = [anchor.x, anchor.y, anchor.z];
-
-            this.setTrackedAnchor(anchorPos, trackedMesh);
-            this.focusOnEntity(obj.userData.entityKey, anchorPos, isMoving);
-
-            if (this.onPickCallback) {
-              this.onPickCallback(obj.userData.entityKey, anchorPos, isMoving);
-            }
-            return;
-          }
-        }
-
-        // 点击空白处
-        this.clearTrackedAnchor();
-        if (this.onBlankClickCallback) {
-          this.onBlankClickCallback();
-        }
+      const start = this.downPos;
+      if (!start || start.pointerId !== e.pointerId) return;
+      this.downPos = null;
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) >= 6) {
+        this.onManualViewCallback?.();
+        return;
       }
-    });
+      this.pickAt(e.clientX, e.clientY);
+    }, { signal });
+    canvas.addEventListener('pointercancel', () => { this.downPos = null; }, { signal });
+    canvas.addEventListener('wheel', () => this.onManualViewCallback?.(), { signal, passive: true });
 
-    // 窗口尺寸自适应
     window.addEventListener('resize', () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const w = this.container.clientWidth;
+      const h = this.container.clientHeight;
+      if (!w || !h) return;
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
-      this.triggerPopupUpdate();
-    });
+      this.requestRender();
+    }, { signal });
+
+    document.addEventListener('visibilitychange', () => {
+      this.clock.getDelta();
+      if (document.hidden) {
+        cancelAnimationFrame(this.reqAnimationId);
+        this.reqAnimationId = 0;
+      } else {
+        this.requestRender();
+      }
+    }, { signal });
   }
 
-  private animate() {
-    this.reqAnimationId = requestAnimationFrame(this.animate);
-    const delta = this.clock.getDelta();
-
-    if (!this.isAnimationPaused) {
-      this.accumulatedTime += delta;
+  private pickAt(x: number, y: number) {
+    const canvas = this.renderer.domElement.getBoundingClientRect();
+    this.pointer.set(
+      ((x - canvas.left) / canvas.width) * 2 - 1,
+      1 - ((y - canvas.top) / canvas.height) * 2
+    );
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const hits = this.raycaster.intersectObjects(this.interactiveMeshes, true);
+    for (const hit of hits) {
+      let object: THREE.Object3D | null = hit.object;
+      while (object?.visible && !object.userData.entityKey) object = object.parent;
+      if (!object?.visible) continue;
+      this.pickEntity(object, [hit.point.x, hit.point.y + 0.35, hit.point.z]);
+      return;
     }
 
+    this.clearTrackedAnchor();
+    this.onBlankClickCallback?.();
+  }
+
+  private requestRender() {
+    if (!this.destroyed && !document.hidden && !this.reqAnimationId) {
+      this.reqAnimationId = requestAnimationFrame(this.animate);
+    }
+  }
+
+  private updateSimulation(forceFleetUpdate = false) {
     // 0. 工业机械臂点动平滑拣选姿态
     if (this.robotArmNodes.length > 0) {
       this.robotArmNodes.forEach((arm) => {
@@ -1517,43 +1489,44 @@ export class WarehouseScene {
       posAttr.needsUpdate = true;
     }
 
-    // 1. AGV 真实闭环物流作业状态机 (接驳装载 ➔ 重载运送 ➔ 机械臂/货垛卸货 ➔ 空车回流)
-    if (this.agvRobots.length > 0) {
-      const { path, unloadProgress } = this.agvRoute;
-      this.agvRobots.forEach((item, idx) => {
-        const lap = this.accumulatedTime * 0.035 + item.offset;
-        const t = lap % 1.0;
-        const pt = path.getPoint(t);
-        const tangent = path.getTangent(t);
+    const { path, unloadProgress } = this.agvRoute;
+    const routeLength = path.getLength();
+    const pickup = path.getPoint(0);
+    const forward = new THREE.Vector3(1, 0, 0);
+    const direction = new THREE.Vector3();
+    const beltStartX = -15.8;
+    const agvHeight = 0.1;
+    let fleetChanged = forceFleetUpdate;
 
-        item.node.position.set(pt.x, 0.1, pt.y);
-        const dir = new THREE.Vector3(tangent.x, 0, tangent.y);
-        item.node.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
+    for (const item of this.agvRobots) {
+      const frame = getAgvFrame(this.accumulatedTime, item.id, item.offset, routeLength, unloadProgress);
+      const pt = path.getPoint(frame.progress);
+      const tangent = path.getTangent(frame.progress);
+      item.node.position.set(pt.x, agvHeight, pt.y);
+      direction.set(tangent.x, 0, tangent.y);
+      item.node.quaternion.setFromUnitVectors(forward, direction);
 
-        // 过取货圆环装载，过东侧卸货圆环后空车回流。
-        const isLoaded = t < unloadProgress;
-        if (item.cargoMesh.visible !== isLoaded) {
-          item.cargoMesh.visible = isLoaded;
-          item.hasCargo = isLoaded;
-          // 每次在月台新装载时，与传送带物料一致交替颜色 (牛皮纸箱 / 白色薄膜箱)
-          if (isLoaded) {
-            const cycle = Math.floor(lap);
-            const isKraft = (idx + cycle) % 2 === 0;
-            item.cargoMesh.material = isKraft ? this.agvKraftMat : this.agvWhiteMat;
-          }
-        }
-      });
+      if (item.phase !== frame.phase || item.hasCargo !== frame.hasCargo) fleetChanged = true;
+      item.phase = frame.phase;
+      item.hasCargo = frame.hasCargo;
+      item.cargoMesh.visible = frame.hasCargo;
+      item.cargoMesh.material = frame.cargoIsKraft ? this.agvKraftMat : this.agvWhiteMat;
+
+      item.beltMesh.visible = frame.beltProgress >= 0;
+      if (item.beltMesh.visible) {
+        const x = THREE.MathUtils.lerp(beltStartX, pickup.x, frame.beltProgress);
+        const deck = agvHeight + item.cargoMesh.position.y;
+        const height = THREE.MathUtils.lerp(0.94, deck, frame.beltTransfer);
+        item.beltMesh.position.set(x, height, pickup.y);
+        item.beltMesh.material = frame.cargoIsKraft ? this.agvWhiteMat : this.agvKraftMat;
+      }
     }
 
-    // 2. 传送带纸箱动态流 (自冷链车厢经伸缩滚筒驳运至月台尽头，与 AGV 接驳位精准咬合)
-    if (this.conveyorCargoList.length > 0) {
-      this.conveyorCargoList.forEach((item) => {
-        const t = (this.accumulatedTime * 0.11 + item.offset) % 1.0;
-        // 起点在卡车车厢内 X = -15.8，终点在伸缩流水线末端 X = -7.4 (正对 AGV 接驳工位)
-        const curX = -15.8 + t * 8.4;
-        // 当货箱到达传送带末端 (t > 0.86) 正对 AGV 车顶，微调高度模拟平滑移载
-        const curY = t > 0.86 ? 0.94 - (t - 0.86) * 1.8 : 0.94;
-        item.mesh.position.set(curX, Math.max(0.68, curY), -5.5);
+    if (fleetChanged) {
+      this.onFleetUpdateCallback?.({
+        vehicles: this.agvRobots.map(({ id, phase, hasCargo }) => ({ id, phase, hasCargo })),
+        speed: routeLength * AGV_LAPS_PER_SECOND,
+        lapSeconds: 1 / AGV_LAPS_PER_SECOND
       });
     }
 
@@ -1565,6 +1538,18 @@ export class WarehouseScene {
       const roadSpan = roadMaxZ - roadMinZ; // 50m
       const curZ = roadMinZ + ((this.accumulatedTime * roadSpeed) % roadSpan);
       this.movingRoadTruck.position.set(28.5, 0.3, curZ);
+    }
+
+  }
+
+  private animate() {
+    this.reqAnimationId = 0;
+    const delta = this.clock.getDelta();
+    const running = !this.isAnimationPaused && this.warehouseModel !== null;
+    if (running) {
+      // 标签页恢复和长帧不应跳过接驳工位。
+      this.accumulatedTime += Math.min(delta, 0.1);
+      this.updateSimulation();
     }
 
     // 4. 由远及近平滑运镜插值 (基于三次缓动曲线)
@@ -1587,13 +1572,43 @@ export class WarehouseScene {
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
     this.triggerPopupUpdate();
+
+    if (running || this.isTransitioningCamera) this.requestRender();
+  }
+
+  private disposeResources(root: THREE.Object3D, textures: THREE.Texture[] = []) {
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    const maps = new Set(textures);
+
+    root.traverse((object) => {
+      const renderable = object as THREE.Mesh;
+      if (renderable.geometry) geometries.add(renderable.geometry);
+      if (!renderable.material) return;
+      const list = Array.isArray(renderable.material) ? renderable.material : [renderable.material];
+      for (const material of list) materials.add(material);
+    });
+
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of materials) {
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture) maps.add(value);
+      }
+      material.dispose();
+    }
+    for (const texture of maps) texture.dispose();
   }
 
   public destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.lifecycle.abort();
     cancelAnimationFrame(this.reqAnimationId);
+    this.controls.dispose();
+    const textures = [this.epoxyNormalMap, this.roadNormalMap].filter((value) => value !== null);
+    this.disposeResources(this.scene, textures);
+    this.sunLight?.shadow.dispose();
     this.renderer.dispose();
-    if (this.renderer.domElement && this.renderer.domElement.parentElement) {
-      this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
-    }
+    this.renderer.domElement.remove();
   }
 }

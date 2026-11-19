@@ -24,6 +24,27 @@ export type EntityKey =
   | 'agv_robot'
   | 'cold_storage';
 
+export type ViewMode = 'reset' | 'top' | 'custom';
+
+export type AgvPhase = 'pickup' | 'loaded' | 'returning';
+
+export interface AgvStatus {
+  id: number;
+  phase: AgvPhase;
+  hasCargo: boolean;
+}
+
+export interface AgvFleet {
+  vehicles: AgvStatus[];
+  speed: number;
+  lapSeconds: number;
+}
+
+export interface EntitySelection {
+  key: EntityKey;
+  agvId?: number;
+}
+
 export interface PopupState {
   visible: boolean;
   entityKey: EntityKey | null;

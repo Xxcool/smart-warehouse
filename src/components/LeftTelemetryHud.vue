@@ -1,5 +1,5 @@
 <template>
-  <aside class="left-telemetry-hud" aria-label="全息运营态势监控">
+  <aside id="warehouse-operations" class="left-telemetry-hud" :class="{ 'panel-open': expanded }" aria-label="全息运营态势监控">
     <!-- 模块 1：今日仓储吞吐量 -->
     <div class="hud-card">
       <div class="hud-card-header">
@@ -54,37 +54,37 @@
           </div>
         </div>
         <div class="status-badge live">
-          <span class="pulse-dot"></span> 7台在线
+          <span class="pulse-dot"></span> {{ fleet.vehicles.length }} 台在线
         </div>
       </div>
 
       <div class="agv-status-grid">
         <div class="status-cell heavy">
-          <div class="cell-num">4 <small>台</small></div>
+          <div class="cell-num">{{ counts.loaded }} <small>台</small></div>
           <div class="cell-desc">重载干线运输</div>
         </div>
         <div class="status-cell empty">
-          <div class="cell-num">2 <small>台</small></div>
+          <div class="cell-num">{{ counts.returning }} <small>台</small></div>
           <div class="cell-desc">空车循轨回流</div>
         </div>
         <div class="status-cell dock">
-          <div class="cell-num">1 <small>台</small></div>
+          <div class="cell-num">{{ counts.pickup }} <small>台</small></div>
           <div class="cell-desc">月台驳运装载</div>
         </div>
       </div>
 
       <div class="agv-meta-row">
         <div class="meta-item">
-          <span class="meta-label">自主避障</span>
-          <span class="meta-val green">激光雷达正常</span>
+          <span class="meta-label">仿真状态</span>
+          <span class="meta-val" :class="{ green: !isPaused }">{{ isPaused ? '已暂停' : '运行中' }}</span>
         </div>
         <div class="meta-item">
           <span class="meta-label">平均车速</span>
-          <span class="meta-val">1.5 m/s</span>
+          <span class="meta-val">{{ (isPaused ? 0 : fleet.speed).toFixed(2) }} m/s</span>
         </div>
         <div class="meta-item">
-          <span class="meta-label">平均电量</span>
-          <span class="meta-val">94%</span>
+          <span class="meta-label">巡线周期</span>
+          <span class="meta-val">{{ fleet.lapSeconds.toFixed(1) }} s</span>
         </div>
       </div>
     </div>
@@ -136,7 +136,20 @@
 </template>
 
 <script setup lang="ts">
-// Props or telemetry store can be easily attached here for real-time socket updates
+import { computed } from 'vue';
+import type { AgvFleet } from '../types/warehouse';
+
+const props = defineProps<{
+  fleet: AgvFleet;
+  isPaused: boolean;
+  expanded: boolean;
+}>();
+
+const counts = computed(() => {
+  const totals = { loaded: 0, returning: 0, pickup: 0 };
+  for (const vehicle of props.fleet.vehicles) totals[vehicle.phase]++;
+  return totals;
+});
 </script>
 
 <style scoped>

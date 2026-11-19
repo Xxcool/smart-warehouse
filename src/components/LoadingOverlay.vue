@@ -15,7 +15,7 @@
       <div class="card-status-bar">
         <div class="status-pulse-group">
           <span class="pulse-dot"></span>
-          <span class="status-text">INITIALIZING DIGITAL TWIN NODE #WH-A01</span>
+          <span class="status-text">{{ error ? 'SCENE UNAVAILABLE' : 'INITIALIZING DIGITAL TWIN' }}</span>
         </div>
         <div class="system-engine-tag">THREE.JS · WEBGL 2.0</div>
       </div>
@@ -35,7 +35,7 @@
       </div>
 
       <!-- 进度条与阶段状态解析 -->
-      <div class="progress-container">
+      <div v-if="!error" class="progress-container" role="status">
         <div class="progress-info-row">
           <span class="phase-desc">{{ currentPhaseText }}</span>
           <span class="progress-pct">{{ progress }}<small>%</small></span>
@@ -45,64 +45,66 @@
           <div class="progress-bar-fill" :style="{ width: progress + '%' }"></div>
         </div>
 
-        <div class="resource-meta-row">
-          <span v-if="error" class="text-error">{{ error }}</span>
-          <span v-else class="resource-text">
-            <span>资源项: <b>{{ items }}/109</b></span>
-            <span class="meta-divider">|</span>
-            <span>着色管线: <b>PBR Physical</b></span>
-            <span class="meta-divider">|</span>
-            <span>帧率目标: <b>60 FPS</b></span>
-          </span>
-        </div>
+        <div class="resource-meta-row">仓库场景 · 本地仿真</div>
       </div>
 
-      <!-- 底部通信握手指示 -->
-      <div class="loading-footer">
-        <span>CONNECTING TO WMS/WCS TELEMETRY BUS · REAL-TIME 60 FPS TWIN</span>
+      <div v-else class="loading-error">
+        <p class="text-error" role="alert">{{ error }}</p>
+        <button type="button" class="retry-button" @click="$emit('retry')">重试</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
+
+defineEmits<{ (e: 'retry'): void }>();
 
 const visible = ref(true);
 const isFading = ref(false);
 const progress = ref(0);
-const items = ref(0);
 const error = ref('');
+let hideTimer = 0;
 
 const currentPhaseText = computed(() => {
-  if (error.value) return '初始化遇到异常，请检查网络或资源文件';
-  if (progress.value < 35) return '【阶段 1/3】解构 3D 几何拓扑与物理材质 (GLTF/PBR)...';
-  if (progress.value < 75) return '【阶段 2/3】规划 AGV 激光巡线轨迹与闭环状态机...';
-  if (progress.value < 99) return '【阶段 3/3】装配全息双态势 HUD 与微晶反射管线...';
-  return '【就绪】全域数字孪生完成握手，即将进入监控大屏...';
+  if (progress.value === 0) return '初始化图形渲染器';
+  if (progress.value < 75) return '下载仓库模型';
+  if (progress.value < 100) return '装配场景与 AGV 仿真';
+  return '场景已就绪';
 });
 
-function updateProgress(p: number, it: number) {
+function updateProgress(p: number) {
   progress.value = p;
-  items.value = it;
+}
+
+function reset() {
+  window.clearTimeout(hideTimer);
+  error.value = '';
+  progress.value = 0;
+  visible.value = true;
+  isFading.value = false;
 }
 
 function complete() {
   progress.value = 100;
-  items.value = 109;
-  setTimeout(() => {
+  hideTimer = window.setTimeout(() => {
     isFading.value = true;
-    setTimeout(() => {
+    hideTimer = window.setTimeout(() => {
       visible.value = false;
     }, 450);
   }, 250);
 }
 
 function setError(msg: string) {
+  reset();
   error.value = msg;
 }
 
+onUnmounted(() => window.clearTimeout(hideTimer));
+
 defineExpose({
+  reset,
   updateProgress,
   complete,
   setError
@@ -114,8 +116,8 @@ defineExpose({
   position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   background: rgba(6, 10, 18, 0.94);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -161,7 +163,8 @@ defineExpose({
 
 /* 主载入卡片 */
 .loading-card {
-  width: 480px;
+  width: min(480px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
   background: linear-gradient(135deg, rgba(11, 18, 30, 0.96) 0%, rgba(15, 23, 42, 0.92) 100%);
   border: 1px solid rgba(0, 240, 255, 0.28);
   border-radius: 14px;
@@ -170,7 +173,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* 科技直角边框角标 */
@@ -369,33 +372,42 @@ defineExpose({
 }
 
 .resource-meta-row {
-  font-size: 10px;
-  color: #64748b;
+  font-size: 11px;
+  color: #94a3b8;
   font-family: ui-monospace, monospace;
-}
-.resource-text {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.resource-text b {
-  color: #cbd5e1;
-}
-.meta-divider {
-  color: rgba(255, 255, 255, 0.15);
-}
-.text-error {
-  color: #ef4444;
 }
 
-/* 底部状态 */
-.loading-footer {
-  text-align: center;
-  font-size: 9px;
-  color: #475569;
-  font-family: ui-monospace, monospace;
-  letter-spacing: 0.8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 10px;
+.loading-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.text-error {
+  color: #fecaca;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.retry-button {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid #67e8f9;
+  border-radius: 6px;
+  background: #103044;
+  color: #b8f7ff;
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .loading-card {
+    padding: 20px 16px;
+  }
+
+  .system-engine-tag {
+    display: none;
+  }
 }
 </style>

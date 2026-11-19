@@ -1,6 +1,6 @@
 import { EntityDetail, EntityKey } from '../types/warehouse';
 
-export const ENTITY_DATA: Record<EntityKey, EntityDetail> = {
+export const ENTITY_DATA: Record<Exclude<EntityKey, 'agv_robot'>, EntityDetail> = {
   pc_workstation: {
     title: "六轴工业机械臂分拣工作台",
     sub: "自动化矩阵式高速拣选与立体码垛岛",
@@ -83,18 +83,6 @@ export const ENTITY_DATA: Record<EntityKey, EntityDetail> = {
       { l: "货箱载重", v: "18.5 吨 (额定 20 吨)" },
       { l: "全程温控", v: "实时冷链传感器在线" },
       { l: "出场放行", v: "车牌识别道闸已预授权" }
-    ]
-  },
-  agv_robot: {
-    title: "AGV 搬运机器人",
-    sub: "正交导引航道 · 激光避障自主搬运",
-    tag: "正常巡线中",
-    rows: [
-      { l: "当前设备", v: "AGV-RoboCarrier-04", blue: true },
-      { l: "剩余电量", v: "92% (健康运行中)", progress: 92 },
-      { l: "巡线航向", v: "分拣工位 ➔ 南区暂存货架", green: true },
-      { l: "运行速度", v: "1.2 米/秒 (转弯自动减速)" },
-      { l: "激光雷达", v: "360° 双目避障无障碍" }
     ]
   },
   cold_storage: {

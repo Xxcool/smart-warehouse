@@ -1,5 +1,6 @@
 <template>
   <aside class="right-equipment-hud" aria-label="设施与环境全息监控">
+    <div id="warehouse-facilities" class="equipment-metrics" :class="{ 'panel-open': expanded }">
     <!-- 模块 1：月台泊位负荷 -->
     <div class="hud-card">
       <div class="hud-card-header">
@@ -84,6 +85,8 @@
       </div>
     </div>
 
+    </div>
+
     <!-- 模块 3：3D 场景与视角控制坞 -->
     <div class="hud-card controls-card">
       <div class="hud-card-header compact">
@@ -108,7 +111,8 @@
         <button
           class="ctrl-btn"
           :class="{ active: currentMode === 'reset' }"
-          @click="handleReset"
+          :aria-pressed="currentMode === 'reset'"
+          @click="$emit('reset-view')"
           title="复位至等轴测全貌 (快捷键 0 / R)"
         >
           <span class="btn-icon">⟲</span>
@@ -117,7 +121,8 @@
         <button
           class="ctrl-btn"
           :class="{ active: currentMode === 'top' }"
-          @click="handleTopView"
+          :aria-pressed="currentMode === 'top'"
+          @click="$emit('top-view')"
           title="切换为顶视平面 (快捷键 T)"
         >
           <span class="btn-icon">📐</span>
@@ -128,20 +133,28 @@
       <button
         class="playback-btn"
         :class="{ paused: isPaused }"
-        @click="handleTogglePlay"
+        :aria-label="isPaused ? '恢复场景物流运动' : '暂停场景物流运动'"
+        @click="$emit('toggle-play')"
         title="暂停/恢复场景内 AGV 与传送带运动 (快捷键 空格)"
       >
         <span class="playback-icon">{{ isPaused ? '▶' : '⏸' }}</span>
-        <span>{{ isPaused ? '恢复场景物流运动' : '暂停场景物流运动' }}</span>
+        <span class="playback-label">{{ isPaused ? '恢复场景物流运动' : '暂停场景物流运动' }}</span>
+        <span class="playback-label-short" aria-hidden="true">{{ isPaused ? '继续' : '暂停' }}</span>
       </button>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import type { ViewMode } from '../types/warehouse';
 
-const emit = defineEmits<{
+defineProps<{
+  currentMode: ViewMode;
+  isPaused: boolean;
+  expanded: boolean;
+}>();
+
+defineEmits<{
   (e: 'zoom-in'): void;
   (e: 'zoom-out'): void;
   (e: 'reset-view'): void;
@@ -149,32 +162,6 @@ const emit = defineEmits<{
   (e: 'toggle-play'): void;
 }>();
 
-const currentMode = ref<'reset' | 'top' | 'custom'>('reset');
-const isPaused = ref(false);
-
-function handleReset() {
-  currentMode.value = 'reset';
-  emit('reset-view');
-}
-
-function handleTopView() {
-  currentMode.value = 'top';
-  emit('top-view');
-}
-
-function handleTogglePlay() {
-  isPaused.value = !isPaused.value;
-  emit('toggle-play');
-}
-
-defineExpose({
-  setPaused(paused: boolean) {
-    isPaused.value = paused;
-  },
-  setMode(mode: 'reset' | 'top' | 'custom') {
-    currentMode.value = mode;
-  }
-});
 </script>
 
 <style scoped>
@@ -189,6 +176,12 @@ defineExpose({
   width: 290px;
   pointer-events: auto;
   user-select: none;
+}
+
+.equipment-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* 赛博微晶卡片基础 */
@@ -488,5 +481,8 @@ defineExpose({
 }
 .playback-icon {
   font-size: 12px;
+}
+.playback-label-short {
+  display: none;
 }
 </style>

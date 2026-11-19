@@ -6,11 +6,11 @@
         <div class="status-pulse-ring">
           <div class="status-dot"></div>
         </div>
-        <span class="live-tag">LIVE 实时孪生</span>
+        <span class="live-tag">场景演示</span>
       </div>
       <div class="brand-info">
         <div class="brand-hub">自动化仓储管控中心</div>
-        <div class="brand-code">NODE #WH-A01 · 60 FPS 全域数字孪生</div>
+        <div class="brand-code">NODE #WH-A01 · 数字孪生演示数据</div>
       </div>
     </div>
 
@@ -47,6 +47,7 @@
       <button
         class="theme-toggle-btn"
         @click="$emit('toggle-theme')"
+        :aria-label="theme === 'cyber' ? '切换到白昼主题' : '切换到夜景主题'"
         :title="theme === 'cyber' ? '当前：赛博深空全息模式，点击切换为白昼展厅模式' : '当前：白昼展厅沙盘模式，点击切换为赛博深空模式'"
       >
         <span class="theme-btn-icon">{{ theme === 'cyber' ? '🌙' : '☀️' }}</span>
@@ -54,7 +55,7 @@
       </button>
 
       <!-- 全屏沉浸按钮 -->
-      <button class="fullscreen-btn" @click="toggleFullscreen" title="切换全屏沉浸大屏">
+      <button v-if="canFullscreen" class="fullscreen-btn" @click="toggleFullscreen" title="切换全屏沉浸大屏" aria-label="切换全屏">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
         </svg>
@@ -76,6 +77,7 @@ defineEmits<{
 
 const currentTime = ref('');
 const currentDate = ref('');
+const canFullscreen = document.fullscreenEnabled && typeof document.documentElement.requestFullscreen === 'function';
 let timer: number | null = null;
 
 function updateClock() {
