@@ -63,7 +63,7 @@ export class WarehouseScene {
   private sunLight: THREE.DirectionalLight | null = null;
   private fillLight: THREE.DirectionalLight | null = null;
   public currentTheme: 'studio' | 'cyber' = 'cyber';
-  private agvCurve: THREE.CatmullRomCurve3;
+  private agvRoute: ReturnType<WarehouseScene['initAgvRoute']>;
 
   private currentTrackedObject: THREE.Object3D | null = null;
   private clickedAnchorWorldPos = new THREE.Vector3();
@@ -122,8 +122,8 @@ export class WarehouseScene {
     this.initLights();
     this.setTheme(this.currentTheme);
 
-    // 6. 初始化 AGV 巡线导引样条 (避开南区货架托盘，Z=4.95)
-    this.agvCurve = this.initAgvRoute();
+    // 6. 初始化 AGV 巡线导引路线
+    this.agvRoute = this.initAgvRoute();
 
     // 7. 初始化传送带动态纸箱
     this.initConveyorCargo();
@@ -547,36 +547,39 @@ export class WarehouseScene {
     this.scene.add(this.cyberParticles);
   }
 
-  private initAgvRoute(): THREE.CatmullRomCurve3 {
-    const agvPathPoints = [
-      // 1. 1号装卸月台自动化滚筒驳运交接工位 (货箱精准对接处)
-      new THREE.Vector3(-9.2, 0.12, -5.5),
-      new THREE.Vector3(-7.2, 0.12, -5.5),
-      new THREE.Vector3(-6.8, 0.12, -5.0),
-      // 2. 西侧主干巡线车道 (平直向南，直达南侧通道)
-      new THREE.Vector3(-6.8, 0.12, -4.6),
-      new THREE.Vector3(-6.8, 0.12, 0.0),
-      new THREE.Vector3(-6.8, 0.12, 4.6),
-      // 3. 南侧中央走廊宽阔车道 (笔直横跨主通道)
-      new THREE.Vector3(-4.0, 0.12, 4.6),
-      new THREE.Vector3(0.0, 0.12, 4.6),
-      new THREE.Vector3(4.0, 0.12, 4.6),
-      new THREE.Vector3(6.8, 0.12, 4.6),
-      // 4. 东侧出入库车道 (经过2/3号月台前侧，笔直向北)
-      new THREE.Vector3(6.8, 0.12, 0.0),
-      new THREE.Vector3(6.8, 0.12, -4.6),
-      // 5. 北侧分拣主干道 (向西巡航)
-      new THREE.Vector3(4.0, 0.12, -4.6),
-      new THREE.Vector3(0.0, 0.12, -4.6),
-      new THREE.Vector3(-4.0, 0.12, -4.6),
-      new THREE.Vector3(-6.8, 0.12, -4.6),
-      new THREE.Vector3(-9.2, 0.12, -4.8),
-      new THREE.Vector3(-9.2, 0.12, -5.5)
-    ];
-    const curve = new THREE.CatmullRomCurve3(agvPathPoints, true, 'centripetal', 0.05);
+  private initAgvRoute() {
+    // 用 Path 的二维坐标表示地面的 X/Z。absarc 会用直线接到圆弧切点。
+    const path = new THREE.Path();
+    const westX = -6.8;
+    const eastX = 6.8;
+    const northZ = -4.6;
+    const southZ = 4.6;
+    const dockX = -8.92;
+    const dockZ = -5.5;
+    const pickupX = -8.5;
+    const unloadZ = -1.5;
+    const aisleRadius = 0.7;
+    const dockRadius = 0.4;
+    // 缩短月台回转支路，让七台车等距巡线时能错开支路交叉口。
+    const dockExitRadius = 0.8;
+    const quarterTurn = Math.PI / 2;
 
-    // 导引虚线 (与地面发光导轨 100% 重合微浮)
-    const routeGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(280));
+    // 以模型的取货圆环为环路起点，在东侧卸货圆环记录已行驶距离。
+    path.moveTo(pickupX, dockZ);
+    path.lineTo(westX - dockExitRadius, dockZ);
+    path.absarc(westX - dockExitRadius, dockZ + dockExitRadius, dockExitRadius, -quarterTurn, 0);
+    path.absarc(westX + aisleRadius, southZ - aisleRadius, aisleRadius, Math.PI, quarterTurn, true);
+    path.absarc(eastX - aisleRadius, southZ - aisleRadius, aisleRadius, quarterTurn, 0, true);
+    path.lineTo(eastX, unloadZ);
+    const unloadDistance = path.getLength();
+    path.absarc(eastX - aisleRadius, northZ + aisleRadius, aisleRadius, 0, -quarterTurn, true);
+    path.absarc(dockX + dockRadius, northZ - dockRadius, dockRadius, quarterTurn, Math.PI);
+    path.absarc(dockX + dockRadius, dockZ + dockRadius, dockRadius, Math.PI, 3 * quarterTurn);
+    path.lineTo(pickupX, dockZ);
+
+    const routeGeo = new THREE.BufferGeometry().setFromPoints(
+      path.getPoints().map((point) => new THREE.Vector3(point.x, 0.12, point.y))
+    );
     const routeMat = new THREE.LineDashedMaterial({
       color: 0x00f0ff,
       dashSize: 0.6,
@@ -593,16 +596,16 @@ export class WarehouseScene {
     arrowGeo.rotateX(Math.PI / 2);
     const arrowMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
     for (let t = 0; t < 1.0; t += 0.05) {
-      const p = curve.getPointAt(t);
-      const tg = curve.getTangentAt(t);
+      const p = path.getPoint(t);
+      const tg = path.getTangent(t);
       const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-      arrow.position.set(p.x, 0.13, p.z);
-      arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tg);
+      arrow.position.set(p.x, 0.13, p.y);
+      arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(tg.x, 0, tg.y));
       navArrowsGroup.add(arrow);
     }
     this.scene.add(navArrowsGroup);
 
-    return curve;
+    return { path, unloadProgress: unloadDistance / path.getLength() };
   }
 
   private initConveyorCargo() {
@@ -666,22 +669,10 @@ export class WarehouseScene {
                 this.mullionMeshes.push(child as THREE.Mesh);
                 child.castShadow = true;
                 child.receiveShadow = true;
-              } else if (n.startsWith('AGV_Trajectory_Laser_Line')) {
-                // 2. AGV 轨迹中心高亮发光线
-                child.castShadow = false;
-                child.receiveShadow = false;
-                (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({
-                  color: 0x00f3ff
-                });
-              } else if (n.startsWith('AGV_Track_Base_Band')) {
-                // 2.1 AGV 轨迹导轨路面基带
-                child.castShadow = false;
-                child.receiveShadow = true;
-                (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                  color: 0x142234,
-                  roughness: 0.35,
-                  metalness: 0.25
-                });
+              } else if (n.startsWith('AGV_Trajectory_Laser_Line') || n.startsWith('AGV_Track_Base_Band')) {
+                // 隐藏模型内的旧导轨，地面导引线和车辆统一使用运行时路线。
+                child.visible = false;
+                return;
               } else if (n.startsWith('AGV_Waypoint_')) {
                 // 2.2 AGV 导航地标与工位圆环
                 child.castShadow = false;
@@ -1528,27 +1519,25 @@ export class WarehouseScene {
 
     // 1. AGV 真实闭环物流作业状态机 (接驳装载 ➔ 重载运送 ➔ 机械臂/货垛卸货 ➔ 空车回流)
     if (this.agvRobots.length > 0) {
+      const { path, unloadProgress } = this.agvRoute;
       this.agvRobots.forEach((item, idx) => {
-        const t = (this.accumulatedTime * 0.035 + item.offset) % 1.0;
-        const pt = this.agvCurve.getPointAt(t);
-        const tangent = this.agvCurve.getTangentAt(t);
+        const lap = this.accumulatedTime * 0.035 + item.offset;
+        const t = lap % 1.0;
+        const pt = path.getPoint(t);
+        const tangent = path.getTangent(t);
 
-        item.node.position.set(pt.x, 0.1, pt.z);
-        const dir = new THREE.Vector3(tangent.x, 0, tangent.z).normalize();
+        item.node.position.set(pt.x, 0.1, pt.y);
+        const dir = new THREE.Vector3(tangent.x, 0, tangent.y);
         item.node.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
 
-        // 状态机流转判定：
-        // 阶段 A: [0.06, 0.62] -> 【重载运输阶段】
-        // 从 1 号月台末端 (X = -7.2, Z = -5.5) 接驳装载纸箱，经西、南主干道运往东侧立体立垛/分拣岛
-        // 阶段 B: [0.62, 1.00] 或 [0.00, 0.06] -> 【空车巡航阶段】
-        // 东区卸货后变为空载状态，经由北侧主干道空车回流，驶往 1 号月台接驳位准备接货
-        const isLoaded = t >= 0.06 && t < 0.62;
+        // 过取货圆环装载，过东侧卸货圆环后空车回流。
+        const isLoaded = t < unloadProgress;
         if (item.cargoMesh.visible !== isLoaded) {
           item.cargoMesh.visible = isLoaded;
           item.hasCargo = isLoaded;
           // 每次在月台新装载时，与传送带物料一致交替颜色 (牛皮纸箱 / 白色薄膜箱)
           if (isLoaded) {
-            const cycle = Math.floor(this.accumulatedTime * 0.035 + item.offset);
+            const cycle = Math.floor(lap);
             const isKraft = (idx + cycle) % 2 === 0;
             item.cargoMesh.material = isKraft ? this.agvKraftMat : this.agvWhiteMat;
           }
